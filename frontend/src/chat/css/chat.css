@@ -1,0 +1,78 @@
+.container {
+    max-width: 800px;
+    margin: auto;
+    padding: 20px;
+}
+.chat-header {
+    text-align: center;
+    background: #075e54;
+    color: white;
+    padding: 12px;
+    font-size: 20px;
+    font-weight: bold;
+    border-radius: 8px 8px 0 0;
+}
+.app-name {
+    color: #25add3;
+}
+
+.app-tagline {
+    color: yellow;
+}
+
+.icon-btn {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 10px;
+    border-radius: 50%;
+    background-color: transparent;
+    border: none;
+    font-size: 24px; /* Adjust size if needed */
+}
+
+.icon-btn:hover {
+    background-color: #f8f9fa;
+    cursor: pointer;
+}
+
+
+.chat-box {
+    background-color: #f4f4f4;
+    border: 1px solid #ddd;
+    border-radius: 10px;
+}
+
+.input-group input {
+    border-radius: 10px 0 0 10px;
+}
+
+.input-group button {
+    border-radius: 0 10px 10px 0;
+}
+
+.btn-warning {
+    border-radius: 50px;
+}
+
+.list-group-item {
+    font-size: 14px;
+}
+
+@media (max-width: 576px) {
+    .container {
+        padding: 10px;
+    }
+
+    .chat-box {
+        height: 250px;
+    }
+
+    .input-group input {
+        font-size: 14px;
+    }
+
+    .input-group button {
+        font-size: 14px;
+    }
+}
