@@ -1,15 +1,42 @@
-import { useContext, useEffect, useState, useRef } from "react";
-import { useNavigate, Link } from "react-router-dom";
+/* eslint-disable react-hooks/exhaustive-deps */
+/* eslint-disable no-unused-vars */
+import { useState, useEffect, useContext, useRef } from "react";
 import AuthContext from "./authContext";
-import { socket } from "./socket.jsx";
+import { socket } from "./socket";
 import axios from "axios";
-import "./css/chat.css";
-import { FaSignOutAlt, FaVideo } from "react-icons/fa";
-import { toast, ToastContainer } from "react-toastify";
+import EmojiPicker from "emoji-picker-react";
+import { FaSignOutAlt, FaVideo, FaSmile, FaArrowLeft } from "react-icons/fa";
+import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
+import { useNavigate, Link } from "react-router-dom";
+import profileImage from "../assets/Amit_Photo.jpg";
+import "./css/chat.css";
 
-// Import profile image
-import profileImage from '../assets/Amit_Photo.jpg';
+// Utility function to format the date and time
+const formatDate = (dateString) => {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const yesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+
+    if (date >= today) {
+        return `Today at ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+    } else if (date >= yesterday) {
+        return `Yesterday at ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+    } else {
+        return date.toLocaleDateString();
+    }
+};
+
+const getUserAvatar = (user) => {
+    const firstLetter = user.username?.charAt(0)?.toUpperCase();
+    return (
+        <div className="avatar-placeholder rounded-circle chat-img">
+            {firstLetter}
+        </div>
+    );
+};
 
 const Chat = () => {
     const { user, setUser } = useContext(AuthContext);
@@ -20,224 +47,264 @@ const Chat = () => {
     const [receiverName, setReceiverName] = useState("");
     const [onlineUsers, setOnlineUsers] = useState({});
     const [userProfile, setUserProfile] = useState({});
+    const [allUsers, setAllUsers] = useState([]);
+    const [showEmojiPicker, setShowEmojiPicker] = useState(false);
     const chatRef = useRef(null);
     const navigate = useNavigate();
 
-    // ✅ Fetch user data from token
+    // New state for mobile responsiveness
+    const [showSidebar, setShowSidebar] = useState(true);
+
+    // 1. Fetch user profile and load last active chat on component mount.
     useEffect(() => {
         const token = localStorage.getItem("token");
-        if (token) {
-            axios.get("http://localhost:5000/api/auth/me", {
-                headers: { Authorization: `Bearer ${token}` }
-            })
-                .then((res) => setUserProfile(res.data))
-                .catch(() => navigate("/"));
-        } else {
+        if (!token) {
             navigate("/");
-        }
-
-        if (user?.userId) {
-            socket.emit("user-online", user.userId);
-
-            // ✅ Listen for online users
-            socket.on("update-user-status", (users) => {
-                setOnlineUsers(users);
-            });
-
-            // ✅ Listen for new messages
-            socket.on("receiveMessage", (data) => {
-                console.log("📨 Message received:", data);
-                setMessages((prevMessages) => [
-                    ...prevMessages,
-                    { sender: data.sender, receiver: data.receiver, content: data.content }
-                ]);
-            });
-
-            return () => {
-                socket.off("receiveMessage");
-                socket.off("update-user-status");
-            };
-        }
-    }, [user, navigate]);
-
-    // ✅ Fetch receiver's details
-    const fetchReceiverDetails = async (username) => {
-        if (!username) {
-            setReceiverName("");
-            setReceiverId("");
             return;
         }
-        try {
-            const res = await axios.get(`http://localhost:5000/api/auth/username/${username}`);
-            if (res.data && res.data._id) {
-                setReceiverName(res.data.username);
-                setReceiverId(res.data._id);
-            } else {
-                setReceiverName("User Not Found");
-                setReceiverId("");
-            }
-        } catch (error) {
-            console.error("Error fetching receiver:", error);
-            setReceiverName("User Not Found");
-            setReceiverId("");
+        axios.get("http://localhost:4000/api/auth/me", { headers: { Authorization: `Bearer ${token}` } })
+            .then(res => {
+                setUserProfile(res.data);
+                const lastReceiverId = localStorage.getItem("lastReceiverId");
+                const lastReceiverName = localStorage.getItem("lastReceiverName");
+                if (lastReceiverId && lastReceiverName) {
+                    setReceiverId(lastReceiverId);
+                    setReceiverName(lastReceiverName);
+                }
+            })
+            .catch(() => navigate("/"));
+    }, []);
+
+    // 2. Socket.io general listeners for user status
+    useEffect(() => {
+        if (userProfile._id) {
+            socket.emit("user-online", userProfile._id);
+            socket.on("update-user-status", setOnlineUsers);
         }
+        return () => {
+            socket.off("update-user-status");
+        };
+    }, [userProfile]);
+
+    // 3. Handle incoming messages and fetch initial messages for a selected chat
+    useEffect(() => {
+        if (!userProfile._id || !receiverId) return;
+
+        const fetchMessages = async () => {
+            try {
+                const res = await axios.get(`http://localhost:4000/api/chat/messages/${receiverId}?userId=${userProfile._id}`, {
+                    headers: {
+                        Authorization: `Bearer ${localStorage.getItem("token")}`
+                    }
+                });
+                setMessages(res.data);
+            } catch (error) {
+                console.error("Failed to fetch messages:", error);
+                setMessages([]);
+            }
+        };
+
+        const handleReceiveMessage = (data) => {
+            setMessages(prev => {
+                if (data.sender === receiverId || data.receiver === receiverId) {
+                    return [...prev, data];
+                }
+                return prev;
+            });
+            if (data.sender === receiverId) {
+                socket.emit("markAsRead", { sender: data.sender, receiver: userProfile._id });
+            }
+        };
+
+        socket.on("receiveMessage", handleReceiveMessage);
+        fetchMessages();
+
+        return () => {
+            socket.off("receiveMessage", handleReceiveMessage);
+        };
+    }, [userProfile, receiverId]);
+
+    // 4. Fetch all users
+    useEffect(() => {
+        const fetchAllUsers = async () => {
+            try {
+                const res = await axios.get("http://localhost:4000/api/auth/users", {
+                    headers: {
+                        Authorization: `Bearer ${localStorage.getItem("token")}`
+                    }
+                });
+                setAllUsers(res.data.filter(u => u._id !== userProfile._id));
+            } catch (error) {
+                console.error("Failed to fetch users:", error);
+            }
+        };
+        if (userProfile._id) {
+            fetchAllUsers();
+        }
+    }, [userProfile]);
+
+    // 5. Mobile responsiveness logic
+    useEffect(() => {
+        const handleResize = () => {
+            if (window.innerWidth > 768) {
+                setShowSidebar(true);
+            } else {
+                if (receiverId) {
+                    setShowSidebar(false);
+                } else {
+                    setShowSidebar(true);
+                }
+            }
+        };
+        window.addEventListener('resize', handleResize);
+        handleResize();
+        return () => window.removeEventListener('resize', handleResize);
+    }, [receiverId]);
+
+    const handleSelectChat = (selectedUser) => {
+        localStorage.setItem("lastReceiverId", selectedUser._id);
+        localStorage.setItem("lastReceiverName", selectedUser.username);
+        setReceiver(selectedUser.username);
+        setReceiverId(selectedUser._id);
+        setReceiverName(selectedUser.username);
+        setShowSidebar(false);
     };
 
-    // ✅ Handle receiver input change
-    const handleReceiverChange = (e) => {
-        const value = e.target.value.trim();
-        setReceiver(value);
-        fetchReceiverDetails(value);
+    const handleBackClick = () => {
+        setShowSidebar(true);
+        setReceiverId("");
+        setReceiverName("");
+        setMessages([]);
     };
 
-    // ✅ Send message
     const sendMessage = async () => {
         if (!message || !receiverId) {
-            alert("Message content and receiver are required.");
+            toast.error("Please select a user and type a message.");
             return;
         }
-
+        const data = {
+            sender: userProfile._id,
+            receiver: receiverId,
+            content: message,
+            type: "text",
+            createdAt: new Date().toISOString(),
+        };
         try {
-            const response = await fetch("http://localhost:5000/api/chat/send", {
-                method: "POST",
+            await axios.post("http://localhost:4000/api/chat/send", data, {
                 headers: {
-                    "Content-Type": "application/json",
                     Authorization: `Bearer ${localStorage.getItem("token")}`,
                 },
-                body: JSON.stringify({
-                    sender: user.userId,
-                    receiver: receiverId,
-                    content: message,
-                }),
             });
-
-            const data = await response.json();
-
-            if (!response.ok) {
-                console.error("Error sending message:", data);
-                alert(data.message || "Failed to send message");
-                return;
-            }
-
-            console.log("✅ Message sent successfully:", data);
-
-            // ✅ Emit the message to the receiver using socket
-            socket.emit("sendMessage", {
-                sender: user.userId,
-                receiver: receiverId,
-                content: message,
-            });
-
-            // ✅ Update state instantly
-            setMessages((prevMessages) => [
-                ...prevMessages,
-                { sender: user.userId, receiver: receiverId, content: message },
-            ]);
-
-            setMessage(""); // Clear input after sending
-        } catch (error) {
-            console.error("❌ Network error:", error);
+            socket.emit("sendMessage", data);
+            setMessages((prev) => [...prev, data]);
+            setMessage("");
+            setShowEmojiPicker(false);
+        } catch {
+            toast.error("Message send failed");
         }
     };
 
-    // ✅ Handle Logout
     const handleLogout = () => {
-        localStorage.removeItem("token");
-        localStorage.removeItem("user");
+        localStorage.clear();
         setUser(null);
         navigate("/");
-        toast.info("⚠ Logged out successfully.");
+        toast.info("Logged out");
     };
 
-    // ✅ Scroll to the latest message when messages change
+    // Auto-scroll to the bottom of the chat box.
     useEffect(() => {
         if (chatRef.current) {
             chatRef.current.scrollTop = chatRef.current.scrollHeight;
         }
     }, [messages]);
 
-    // ✅ Reset messages when the receiver changes
-    useEffect(() => {
-        setMessages([]);
-    }, [receiverId]);
-
     return (
-        <div className="container mt-4">
-            <div className="d-flex justify-content-between align-items-center mb-3">
-                <div className="d-flex align-items-center">
-                    {/* Profile image */}
-                    <img
-                        src={profileImage}
-                        alt="Profile"
-                        className="rounded-circle me-2"
-                        width="40"
-                        height="40"
-                    />
-                    <span className="fw-bold">{userProfile.username || "Guest"}</span>
-                </div>
-                <button className="btn btn-danger btn-sm" onClick={handleLogout}>
-                    <FaSignOutAlt />
-                </button>
-            </div>
-
-            <div className="mt-3">
-                <Link to="/video" className="btn btn-warning icon-btn">
-                    <FaVideo />
-                </Link>
-            </div>
-
-            <h1 className="chat-header">
-                <span className="app-name">Yash</span><span className="app-tagline">App</span>
-            </h1>
-
-            <div className="card p-3">
-                <h5>📌 Online Users</h5>
-                <ul className="list-group">
-                    {Object.entries(onlineUsers).map(([username]) => (
-                        <li
-                            key={username}
-                            className="list-group-item d-flex justify-content-between align-items-center"
-                            onClick={() => handleReceiverChange({ target: { value: username } })}
-                            style={{ cursor: "pointer" }}
-                        >
-                            {username} <span className="badge bg-success">✅ Online</span>
-                        </li>
-                    ))}
-                </ul>
-            </div>
-
-            <div className="mb-3">
-                <input
-                    className="form-control"
-                    type="text"
-                    placeholder="Receiver Username"
-                    value={receiver}
-                    onChange={handleReceiverChange}
-                />
-                {receiverName && <p className="text-muted">Chatting with: {receiverName}</p>}
-            </div>
-
-            <div className="chat-box p-3 border rounded" style={{ height: "300px", overflowY: "auto" }} ref={chatRef}>
-                {messages.map((msg, index) => (
-                    <p key={index} className={msg.sender === user.userId ? "text-end" : "text-start"}>
-                        <b>{msg.sender === user.userId ? "Me" : receiverName}:</b> {msg.content}
-                    </p>
-                ))}
-            </div>
-
-            <div className="input-group mt-3 mb-5">
-                <input
-                    className="form-control"
-                    type="text"
-                    placeholder="Type a message..."
-                    value={message}
-                    onChange={(e) => setMessage(e.target.value)}
-                />
-                <button className="btn btn-primary" onClick={sendMessage}>Send</button>
-            </div>
-
-            {/* Toast container */}
+        <div className="whatsapp-container">
             <ToastContainer />
+            <div className={`sidebar ${!showSidebar ? 'hide-on-mobile' : ''}`}>
+                <div className="profile-header">
+                    <img src={profileImage} alt="Profile" className="rounded-circle profile-img" />
+                    <span>{userProfile.username}</span>
+                    <button className="btn btn-logout" onClick={handleLogout}>
+                        <FaSignOutAlt />
+                    </button>
+                </div>
+                <div className="chat-list">
+                    {allUsers.map((u) => (
+                        <div key={u._id} className={`chat-item ${receiverId === u._id ? 'active' : ''}`} onClick={() => handleSelectChat(u)}>
+                            {getUserAvatar(u)}
+                            <div className="chat-info">
+                                <span className="chat-name">{u.username}</span>
+                                <small className={`status-dot ${onlineUsers[u._id] ? 'online' : 'offline'}`}></small>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            </div>
+
+            <div className={`chat-main ${showSidebar ? 'hide-on-mobile' : ''}`}>
+                <div className="chat-header">
+                    <div className="d-flex align-items-center">
+                        {window.innerWidth <= 768 && !showSidebar && (
+                            <button className="btn btn-back me-2" onClick={handleBackClick}>
+                                <FaArrowLeft />
+                            </button>
+                        )}
+                        {receiverId ? getUserAvatar({ username: receiverName }) : <img src={profileImage} alt="Receiver" className="rounded-circle me-2 chat-img" />}
+                        <div className="chat-header-info">
+                            <span className="fw-bold">{receiverName || "Select a chat"}</span>
+                            <small className="text-muted">{receiverId && (onlineUsers[receiverId] ? "Online" : "Offline")}</small>
+                        </div>
+                    </div>
+                    {receiverId && (
+                        <Link to={{ pathname: "/video", state: { receiverId, receiverName } }} className="btn btn-video-call">
+                            <FaVideo />
+                        </Link>
+                    )}
+                </div>
+
+                <div className="chat-box" ref={chatRef}>
+                    {messages.length === 0 && (
+                        <div className="empty-chat-message">
+                            <p>No messages yet. Start a conversation!</p>
+                        </div>
+                    )}
+                    {messages.map((msg, i) => (
+                        <div key={i} className={`message-bubble ${msg.sender === userProfile._id ? "sent" : "received"}`}>
+                            <div className="message-content">
+                                {msg.type === "image" ? (
+                                    <img src={msg.content} alt="sent" className="message-image" />
+                                ) : (
+                                    <p>{msg.content}</p>
+                                )}
+                                <span className="message-time">{formatDate(msg.createdAt)}</span>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+
+                <div className="chat-input-area">
+                    {showEmojiPicker && (
+                        <EmojiPicker onEmojiClick={(emojiData) => setMessage(prev => prev + emojiData.emoji)} />
+                    )}
+                    <button className="btn btn-icon" onClick={() => setShowEmojiPicker(!showEmojiPicker)}>
+                        <FaSmile />
+                    </button>
+                    <input
+                        className="form-control message-input"
+                        value={message}
+                        onChange={(e) => setMessage(e.target.value)}
+                        onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
+                        placeholder="Type a message"
+                        disabled={!receiverId}
+                    />
+                    <button className="btn btn-primary send-btn" onClick={sendMessage} disabled={!receiverId || !message}>
+                        <svg viewBox="0 0 24 24" width="24" height="24" className="">
+                            <path fill="currentColor" d="M1.101 21.757L23.8 12.028 1.101 2.3zM14.444 12L2.015 20.315 2.5 12 2.015 3.685z"></path>
+                        </svg>
+                    </button>
+                </div>
+            </div>
         </div>
     );
 };

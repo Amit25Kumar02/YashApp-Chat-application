@@ -22,7 +22,7 @@ const Login = () => {
         }
 
         try {
-            const res = await axios.post("http://localhost:5000/api/auth/login", { username, password });
+            const res = await axios.post("http://localhost:4000/api/auth/login", { username, password });
 
             // ✅ Save Token and user in LocalStorage
             localStorage.setItem("token", res.data.token);

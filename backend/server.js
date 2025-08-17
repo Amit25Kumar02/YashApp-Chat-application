@@ -1,158 +1,130 @@
-const express = require("express");
-const http = require("http");
-const socketIo = require("socket.io");
-const cors = require("cors");
-const dotenv = require("dotenv");
-const mongoose = require("mongoose");
-const User = require("./models/User");
-const Message = require("./models/Message");
-const connectDB = require("./db");
-const Users = require("./routes/authRoutes");
+const express = require('express');
+const http = require('http');
+const socketIo = require('socket.io');
+const cors = require('cors');
+const mongoose = require('mongoose');
+const dotenv = require('dotenv');
+const connectDB = require('./db');
+const Message = require('./models/Message');
+const Group = require('./models/Group');
+const User = require('./models/User');
 
 dotenv.config();
-const app = express();
-const server = http.createServer(app);
-const io = socketIo(server, { cors: { origin: "*" } });
+connectDB();
 
+const app = express();
 app.use(cors());
 app.use(express.json());
+app.use("/api/auth", require('./routes/authRoutes'));
+app.use("/api/chat", require('./routes/chatRoutes'));
 
-// ✅ Ensure Database is Connected Before Proceeding
-connectDB()
-    .then(() => console.log("✅ Database Connected Successfully"))
-    .catch((err) => {
-        console.error("❌ Database Connection Failed:", err);
-        process.exit(1); // Stop execution if DB fails
-    });
+const server = http.createServer(app);
+const io = socketIo(server, { cors: { origin: '*' } });
 
-// ✅ Define chatRoutes AFTER io is initialized
-const chatRoutes = require("./routes/chatRoutes")(io);
-
-// ✅ API Routes
-app.use("/api/auth", Users);
-app.use("/api/chat", chatRoutes);
-
-// 🌐 Store Online Users
-let users = {}; // Store username to socketId mapping
-let offlineMessages = {}; // Store messages for offline users temporarily
+// Correctly manage online users
+const onlineUsers = {};
 
 io.on("connection", (socket) => {
-    console.log("A user connected: ", socket.id);
+    console.log("🟢 Socket connected:", socket.id);
 
-    // User goes online
+    // This event should be the only way to map a user ID to a socket ID
     socket.on("user-online", async (userId) => {
         try {
-            // Update the user status in the database
             const user = await User.findByIdAndUpdate(userId, { online: true }, { new: true });
-    
             if (user) {
-                // Store the socket.id mapped to username
-                users[user.username] = socket.id;
-                console.log(`User ${user.username} is online`);
-    
-                // Emit the updated online users list to all connected clients
-                io.emit("update-user-status", users);
-    
-                // Send any offline messages if available
-                if (offlineMessages[user.username]) {
-                    offlineMessages[user.username].forEach((message) => {
-                        io.to(socket.id).emit("receiveMessage", message); // Send to the specific socket
-                    });
-    
-                    // Clear offline messages after they have been delivered
-                    offlineMessages[user.username] = [];
-                }
+                onlineUsers[user._id] = socket.id; // Use the onlineUsers map
+                io.emit("update-user-status", onlineUsers);
             }
         } catch (err) {
-            console.error("Error updating user online status:", err);
+            console.error("❌ Error setting user online:", err);
+        }
+    });
+
+    // === WebRTC Signaling Events (New) ===
+    
+    // 1. A client wants to initiate a call
+    socket.on('call-invitation', ({ to, from, name }) => {
+        const receiverSocketId = onlineUsers[to];
+        if (receiverSocketId) {
+            io.to(receiverSocketId).emit('call-invitation', { from, name });
+        }
+    });
+
+    // 2. The caller sends an SDP offer
+    socket.on('offer', ({ to, sdp }) => {
+        const receiverSocketId = onlineUsers[to];
+        if (receiverSocketId) {
+            io.to(receiverSocketId).emit('offer', { from: socket.id, sdp });
+        }
+    });
+
+    // 3. The receiver sends an SDP answer
+    socket.on('answer', ({ to, sdp }) => {
+        const callerSocketId = onlineUsers[to];
+        if (callerSocketId) {
+            io.to(callerSocketId).emit('answer', { sdp });
+        }
+    });
+
+    // 4. Clients exchange ICE candidates
+    socket.on('ice-candidate', ({ to, candidate }) => {
+        const otherUserSocketId = onlineUsers[to];
+        if (otherUserSocketId) {
+            io.to(otherUserSocketId).emit('ice-candidate', { candidate });
+        }
+    });
+
+    // 5. The receiver accepts the call
+    socket.on('call-accepted', ({ to }) => {
+        const callerSocketId = onlineUsers[to];
+        if (callerSocketId) {
+            io.to(callerSocketId).emit('call-accepted');
+        }
+    });
+
+    // 6. A client rejects or ends the call
+    socket.on('call-rejected', ({ to }) => {
+        const callerSocketId = onlineUsers[to];
+        if (callerSocketId) {
+            io.to(callerSocketId).emit('call-rejected');
         }
     });
     
-    // Handle message sending
-    socket.on("sendMessage", async (message) => {
-        console.log("Received message:", message);  // Add this line to log the data
-    
-        const { sender, receiver, content } = message;
-    
-        // Check if content exists
-        if (!content) {
-            console.error("Message content is missing!", message);
-            return;
+    socket.on('call-ended', ({ to }) => {
+        const otherUserSocketId = onlineUsers[to];
+        if (otherUserSocketId) {
+            io.to(otherUserSocketId).emit('call-ended');
         }
-    
+    });
+
+    // === Existing Chat Events ===
+
+    socket.on("sendMessage", async ({ sender, receiver, content, type = "text" }) => {
         try {
-            const newMessage = new Message({
-                sender,
-                receiver,
-                content,
-                msgDelivered: true,
-            });
-    
-            await newMessage.save();
-            console.log("Message saved:", newMessage);
-        } catch (err) {
-            console.error("Error:", err);
-        }
-    });
-      
-     // User disconnects (goes offline)
-    socket.on("disconnect", async () => {
-        for (let username in users) {
-            if (users[username] === socket.id) {
-                try {
-                    // Update user status to offline in the database
-                    const user = await User.findOneAndUpdate(
-                        { username }, 
-                        { online: false }, 
-                        { new: true }
-                    );
-                    if (user) {
-                        delete users[username]; // Remove the socket ID from the list
-                        console.log(`User ${user.username} is offline`);
-
-                        // Emit the updated online users list
-                        io.emit("update-user-status", users);
-                    }
-                } catch (err) {
-                    console.error("Error updating user offline status:", err);
-                }
+            const msg = new Message({ sender, receiver, content, type, read: false });
+            await msg.save();
+            const receiverSocketId = onlineUsers[receiver];
+            if (receiverSocketId) {
+                io.to(receiverSocketId).emit("receiveMessage", msg);
+            } else {
+                // Handle offline messages
             }
+        } catch (err) {
+            console.error("❌ Message send error:", err);
         }
     });
 
-    // 🎥 Video Call Events
-    // Join room for video call
-    socket.on("join-room", (roomId, userId) => {
-        socket.join(roomId);
-        socket.to(roomId).emit("user-connected", userId);
-        console.log(`📞 User ${userId} joined Room ${roomId}`);
-    });
-
-    // Handle video call offer
-    socket.on("offer", (data) => {
-        const { offer, from, to } = data;
-        if (users[to]) {
-            io.to(users[to]).emit("offer", { offer, from });
-        }
-    });
-
-    // Handle video call answer
-    socket.on("answer", (data) => {
-        const { answer, to } = data;
-        if (users[to]) {
-            io.to(users[to]).emit("answer", { answer });
-        }
-    });
-
-    // Handle ICE candidates
-    socket.on("ice-candidate", (data) => {
-        const { candidate, to } = data;
-        if (users[to]) {
-            io.to(users[to]).emit("ice-candidate", { candidate });
+    socket.on("disconnect", () => {
+        for (let uid in onlineUsers) {
+            if (onlineUsers[uid] === socket.id) {
+                delete onlineUsers[uid];
+                io.emit("update-user-status", onlineUsers);
+                break;
+            }
         }
     });
 });
 
-// 🚀 Start Server
-const PORT = process.env.PORT || 5000;
-server.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
+server.listen(process.env.PORT || 4000, () => {
+    console.log(`🚀 Server running on port ${process.env.PORT || 4000}`);
+});

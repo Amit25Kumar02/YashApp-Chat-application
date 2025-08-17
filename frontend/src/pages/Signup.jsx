@@ -39,7 +39,7 @@ const Signup = () => {
         }
 
         try {
-            const res = await axios.post("http://localhost:5000/api/auth", user);
+            const res = await axios.post("http://localhost:4000/api/auth", user);
             if (res.data.success) {
                 toast.success("✅ Signup successful! Please login.");
                 navigate("/"); 

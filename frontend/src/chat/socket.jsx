@@ -1,36 +1,41 @@
 import { io } from "socket.io-client";
 
 // Define the Socket.IO server URL
-const SOCKET_URL = "http://localhost:5000";  
+const SOCKET_URL = "http://localhost:4000";  
 
 // Connect to the Socket.IO server
 export const socket = io(SOCKET_URL, {
-    transports: ["websocket"],  // Use WebSocket transport
-    reconnectionAttempts: 5,    // Retry 5 times if the connection fails
-    timeout: 10000,             // Timeout for connection attempts
+  transports: ["websocket"],
+  reconnectionAttempts: 5,
+  timeout: 10000,
 });
 
-// Emit when the user is online (triggered when user logs in or connects)
-const userId = "your_user_id";  // Replace with actual user ID
-socket.emit("user-online", userId);
+// ✅ Emit "user-online" if user is logged in
+const savedUser = JSON.parse(localStorage.getItem("user"));
+const userId = savedUser?.userId;
 
-// Listen for incoming messages from the server
+if (userId) {
+  console.log("📡 Emitting user-online:", userId);
+  socket.emit("user-online", userId);
+} else {
+  console.warn("⚠️ No userId found in localStorage");
+}
+
+// ✅ Receive message listener
 socket.on("receiveMessage", (message) => {
-    console.log("Received message:", message);
+  console.log("📩 Received message:", message);
 });
 
-// Send a message to another user
-// eslint-disable-next-line no-unused-vars
-const sendMessage = (receiver) => {
-    socket.emit("sendMessage", { receiver, content: "Hello!" });
+// ✅ Optional test sendMessage function
+export const sendMessage = (receiver, content = "Hello!") => {
+  socket.emit("sendMessage", { receiver, content });
 };
 
-// Listen for the connection event
+// ✅ Socket events
 socket.on("connect", () => {
-    console.log("✅ Connected to Socket.IO Server:", socket.id);
+  console.log("🟢 Connected to Socket.IO Server:", socket.id);
 });
 
-// Listen for the disconnection event
 socket.on("disconnect", () => {
-    console.log("❌ Disconnected from server");
+  console.log("🔴 Disconnected from server");
 });
