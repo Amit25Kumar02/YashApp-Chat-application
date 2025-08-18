@@ -24,7 +24,7 @@ const VideoCall = () => {
     const timeoutRef = useRef(null);
 
     const [userProfile, setUserProfile] = useState(null);
-    const [isCaller, setIsCaller] = useState(true); // New state to determine if the user is the caller
+    const [isCaller, setIsCaller] = useState(true);
 
     useEffect(() => {
         const fetchProfile = async () => {
@@ -46,11 +46,11 @@ const VideoCall = () => {
             iceServers: [{ urls: "stun:stun.l.google.com:19302" }]
         });
 
-        startLocalStream();
-
+        // ✅ This is the crucial change. Ensure ontrack is set up before adding tracks.
         peerConnection.current.ontrack = (event) => {
             if (remoteVideoRef.current.srcObject !== event.streams[0]) {
                 remoteVideoRef.current.srcObject = event.streams[0];
+                setCallStarted(true); // Ensures the receiver view becomes active
             }
         };
 
@@ -61,18 +61,19 @@ const VideoCall = () => {
         };
 
         const handleOffer = async ({ from, sdp }) => {
-            setIsCaller(false); // The user is the receiver if they receive an offer
+            setIsCaller(false);
             await peerConnection.current.setRemoteDescription(new RTCSessionDescription(sdp));
+            // Add the local stream tracks before creating the answer
+            startLocalStream(); 
             const answer = await peerConnection.current.createAnswer();
             await peerConnection.current.setLocalDescription(answer);
             socket.emit("answer", { to: from, sdp: answer });
-            setCallStarted(true); // ✅ Correctly sets callStarted to true on the receiver side
         };
 
         const handleAnswer = async ({ sdp }) => {
             clearTimeout(timeoutRef.current);
             await peerConnection.current.setRemoteDescription(new RTCSessionDescription(sdp));
-            setCallStarted(true); // ✅ Correctly sets callStarted to true on the caller side
+            setCallStarted(true);
         };
 
         const handleIceCandidate = ({ candidate }) => {
@@ -91,6 +92,9 @@ const VideoCall = () => {
         socket.on("answer", handleAnswer);
         socket.on("ice-candidate", handleIceCandidate);
         socket.on("call-ended", handleCallEnded);
+
+        // ✅ Also, call startLocalStream() here to ensure the caller's video is ready before starting the call
+        startLocalStream();
 
         return () => {
             socket.off("offer", handleOffer);
@@ -125,6 +129,10 @@ const VideoCall = () => {
             };
             const stream = await navigator.mediaDevices.getUserMedia(constraints);
             localVideoRef.current.srcObject = stream;
+            // Clear existing tracks before adding new ones
+            const existingTracks = peerConnection.current.getSenders();
+            existingTracks.forEach(sender => peerConnection.current.removeTrack(sender));
+
             stream.getTracks().forEach(track => {
                 peerConnection.current.addTrack(track, stream);
             });
@@ -151,7 +159,6 @@ const VideoCall = () => {
     };
 
     const endCall = () => {
-        // Stop the duration timer
         clearInterval(durationIntervalRef.current);
         clearTimeout(timeoutRef.current);
 
@@ -168,7 +175,6 @@ const VideoCall = () => {
         if (peerConnection.current) {
             peerConnection.current.close();
         }
-        // ✅ Emits the signal to the other user that the call has ended
         socket.emit("call-ended", { to: receiverId });
         navigate("/chat");
     };
@@ -241,7 +247,6 @@ const VideoCall = () => {
                 )}
                 {callStarted && (
                     <>
-                        {/* The end call button is always shown once the call has started for both parties */}
                         <button onClick={endCall} className="icon-btn end-call">
                             <FaTimes />
                         </button>
