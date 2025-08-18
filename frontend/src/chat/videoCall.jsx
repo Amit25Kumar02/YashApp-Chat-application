@@ -66,13 +66,13 @@ const VideoCall = () => {
             const answer = await peerConnection.current.createAnswer();
             await peerConnection.current.setLocalDescription(answer);
             socket.emit("answer", { to: from, sdp: answer });
-            setCallStarted(true);
+            setCallStarted(true); // ✅ Correctly sets callStarted to true on the receiver side
         };
 
         const handleAnswer = async ({ sdp }) => {
             clearTimeout(timeoutRef.current);
             await peerConnection.current.setRemoteDescription(new RTCSessionDescription(sdp));
-            setCallStarted(true);
+            setCallStarted(true); // ✅ Correctly sets callStarted to true on the caller side
         };
 
         const handleIceCandidate = ({ candidate }) => {
@@ -168,6 +168,7 @@ const VideoCall = () => {
         if (peerConnection.current) {
             peerConnection.current.close();
         }
+        // ✅ Emits the signal to the other user that the call has ended
         socket.emit("call-ended", { to: receiverId });
         navigate("/chat");
     };
@@ -240,6 +241,7 @@ const VideoCall = () => {
                 )}
                 {callStarted && (
                     <>
+                        {/* The end call button is always shown once the call has started for both parties */}
                         <button onClick={endCall} className="icon-btn end-call">
                             <FaTimes />
                         </button>

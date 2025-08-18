@@ -255,6 +255,9 @@ body {
     transform: rotate(45deg);
     color: #fff;
 }
+.call-notification{
+    z-index: 1000;
+}
 
 .empty-chat-message {
     text-align: center;
