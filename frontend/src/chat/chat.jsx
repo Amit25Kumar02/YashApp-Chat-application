@@ -16,6 +16,10 @@ import "./css/chat.css";
 import ringingSound from "../assets/audio/ring.mp3"; 
 import callingSound from "../assets/audio/calling.mp3";
 
+// const APIURL = "http://localhost:4000/api";
+const APIURL = "https://yashapp-chat-application.onrender.com/api";
+
+
 const formatDate = (dateString) => {
     if (!dateString) return '';
     const date = new Date(dateString);
@@ -67,7 +71,7 @@ const Chat = () => {
             navigate("/");
             return;
         }
-        axios.get("http://localhost:4000/api/auth/me", { headers: { Authorization: `Bearer ${token}` } })
+        axios.get(`${APIURL}/auth/me`, { headers: { Authorization: `Bearer ${token}` } })
             .then(res => {
                 setUserProfile(res.data);
                 const lastReceiverId = localStorage.getItem("lastReceiverId");
@@ -128,7 +132,7 @@ const Chat = () => {
 
         const fetchMessages = async () => {
             try {
-                const res = await axios.get(`http://localhost:4000/api/chat/messages/${receiverId}?userId=${userProfile._id}`, {
+                const res = await axios.get(`${APIURL}/chat/messages/${receiverId}?userId=${userProfile._id}`, {
                     headers: {
                         Authorization: `Bearer ${localStorage.getItem("token")}`
                     }
@@ -163,7 +167,7 @@ const Chat = () => {
     useEffect(() => {
         const fetchAllUsers = async () => {
             try {
-                const res = await axios.get("http://localhost:4000/api/auth/users", {
+                const res = await axios.get(`${APIURL}/auth/users`, {
                     headers: {
                         Authorization: `Bearer ${localStorage.getItem("token")}`
                     }
@@ -224,7 +228,7 @@ const Chat = () => {
             createdAt: new Date().toISOString(),
         };
         try {
-            await axios.post("http://localhost:4000/api/chat/send", data, {
+            await axios.post(`${APIURL}/chat/send`, data, {
                 headers: {
                     Authorization: `Bearer ${localStorage.getItem("token")}`,
                 },

@@ -1,7 +1,8 @@
 import { io } from "socket.io-client";
 
 // Define the Socket.IO server URL
-const SOCKET_URL = "http://localhost:4000";  
+// const SOCKET_URL = "http://localhost:4000";  
+const SOCKET_URL = "https://yashapp-chat-application.onrender.com"; 
 
 // Connect to the Socket.IO server
 export const socket = io(SOCKET_URL, {

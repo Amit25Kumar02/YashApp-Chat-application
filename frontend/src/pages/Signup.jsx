@@ -6,6 +6,9 @@ import 'react-toastify/dist/ReactToastify.css';
 import { FiEye, FiEyeOff } from "react-icons/fi";
 import './signup.css'; // Make sure this CSS file exists
 
+const APIURL = "https://yashapp-chat-application.onrender.com/api";
+// const APIURL = "http://localhost:4000/api"; 
+
 const Signup = () => {
     const [user, setUser] = useState({
         username: "",
@@ -37,7 +40,7 @@ const Signup = () => {
         }
 
         try {
-            const res = await axios.post("http://localhost:4000/api/auth", user);
+            const res = await axios.post(`${APIURL}/auth`, user);
             toast.success("Signup successful! Please login.");
             navigate("/");
             setUser({
