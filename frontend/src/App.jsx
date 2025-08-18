@@ -1,5 +1,5 @@
 import { BrowserRouter, Route, Routes } from "react-router-dom";
-import Signup from "./pages/signup";
+import Signup from "./pages/Signup";
 import Login from "./pages/login";
 import Chat from "./chat/chat";
 import VideoCall from "./chat/videoCall";
