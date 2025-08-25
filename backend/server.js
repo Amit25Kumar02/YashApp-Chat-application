@@ -14,15 +14,29 @@ connectDB();
 
 const app = express();
 
-// Set the allowed origin for CORS
-// IMPORTANT: Replace this with your actual Vercel frontend URL
-const allowedOrigin = 'https://yash-app-chat-application-19.vercel.app';
+// --- START: CORS Configuration for Local and Live ---
+
+// Define the allowed origins based on the environment
+const allowedOrigins = process.env.NODE_ENV === 'production'
+  ? ['https://yash-app-chat-application-19.vercel.app'] // Your Vercel domain
+  : ['http://localhost:5173', 'http://localhost:3000']; // Your local development URLs
 
 // Configure CORS middleware for Express
 app.use(cors({
-  origin: allowedOrigin,
+  origin: function (origin, callback) {
+    // allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.indexOf(origin) === -1) {
+      const msg = 'The CORS policy for this site does not ' +
+                  'allow access from the specified Origin.';
+      return callback(new Error(msg), false);
+    }
+    return callback(null, true);
+  },
   credentials: true,
 }));
+
+// --- END: CORS Configuration ---
 
 app.use(express.json());
 app.use("/api/auth", require('./routes/authRoutes'));
@@ -30,10 +44,10 @@ app.use("/api/chat", require('./routes/chatRoutes'));
 
 const server = http.createServer(app);
 
-// Configure Socket.IO to allow connections from the Vercel frontend
+// Configure Socket.IO to allow connections from both origins
 const io = socketIo(server, {
   cors: {
-    origin: allowedOrigin,
+    origin: allowedOrigins,
     methods: ['GET', 'POST'],
     credentials: true,
   }
