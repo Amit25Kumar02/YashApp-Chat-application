@@ -64,6 +64,7 @@ const Chat = () => {
     const [showSidebar, setShowSidebar] = useState(true);
     const [videoCallData, setVideoCallData] = useState(null);
     const [isCalling, setIsCalling] = useState(false);
+    const [isSending, setIsSending] = useState(false);
 
     useEffect(() => {
         const token = localStorage.getItem("token");
@@ -145,12 +146,22 @@ const Chat = () => {
         };
 
         const handleReceiveMessage = (data) => {
+            // Only add the message if it's not already in the messages array
             setMessages(prev => {
-                if (data.sender === receiverId || data.receiver === receiverId) {
+                const messageExists = prev.some(msg => 
+                    msg._id === data._id || 
+                    (msg.content === data.content && 
+                     msg.sender === data.sender && 
+                     msg.receiver === data.receiver &&
+                     new Date(msg.createdAt).getTime() === new Date(data.createdAt).getTime())
+                );
+                
+                if (!messageExists && (data.sender === receiverId || data.receiver === receiverId)) {
                     return [...prev, data];
                 }
                 return prev;
             });
+            
             if (data.sender === receiverId) {
                 socket.emit("markAsRead", { sender: data.sender, receiver: userProfile._id });
             }
@@ -216,29 +227,53 @@ const Chat = () => {
     };
 
     const sendMessage = async () => {
-        if (!message || !receiverId) {
+        if (!message || !receiverId || isSending) {
             toast.error("Please select a user and type a message.");
             return;
         }
+        
+        setIsSending(true);
+        const tempMessageId = Date.now().toString(); // Create a temporary ID for the message
+        
         const data = {
             sender: userProfile._id,
             receiver: receiverId,
             content: message,
             type: "text",
             createdAt: new Date().toISOString(),
+            tempId: tempMessageId // Add temporary ID to avoid duplicates
         };
+        
         try {
-            await axios.post(`${APIURL}/chat/send`, data, {
+            // Add message to local state immediately for better UX
+            setMessages(prev => [...prev, { ...data, _id: tempMessageId }]);
+            
+            // Send message via API
+            const response = await axios.post(`${APIURL}/chat/send`, data, {
                 headers: {
                     Authorization: `Bearer ${localStorage.getItem("token")}`,
                 },
             });
-            socket.emit("sendMessage", data);
-            setMessages((prev) => [...prev, data]);
+            
+            // Replace the temporary message with the actual one from the server
+            if (response.data && response.data._id) {
+                setMessages(prev => prev.map(msg => 
+                    msg.tempId === tempMessageId ? response.data : msg
+                ));
+            }
+            
+            // Emit socket event with the actual message data (including _id from server)
+            socket.emit("sendMessage", response.data || data);
+            
             setMessage("");
             setShowEmojiPicker(false);
-        } catch {
+        } catch (error) {
+            console.error("Message send failed:", error);
+            // Remove the temporary message if sending failed
+            setMessages(prev => prev.filter(msg => msg.tempId !== tempMessageId));
             toast.error("Message send failed");
+        } finally {
+            setIsSending(false);
         }
     };
 
@@ -352,7 +387,7 @@ const Chat = () => {
                         </div>
                     )}
                     {messages.map((msg, i) => (
-                        <div key={i} className={`message-bubble ${msg.sender === userProfile._id ? "sent" : "received"}`}>
+                        <div key={msg._id || i} className={`message-bubble ${msg.sender === userProfile._id ? "sent" : "received"}`}>
                             <div className="message-content">
                                 {msg.type === "image" ? (
                                     <img src={msg.content} alt="sent" className="message-image" />
@@ -378,9 +413,9 @@ const Chat = () => {
                         onChange={(e) => setMessage(e.target.value)}
                         onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
                         placeholder="Type a message"
-                        disabled={!receiverId}
+                        disabled={!receiverId || isSending}
                     />
-                    <button className="btn btn-primary send-btn" onClick={sendMessage} disabled={!receiverId || !message}>
+                    <button className="btn btn-primary send-btn" onClick={sendMessage} disabled={!receiverId || !message || isSending}>
                        <span className="send-icons">▷</span>
                     </button>
                 </div>
