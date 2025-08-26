@@ -92,6 +92,7 @@ const Chat = () => {
         socket.on("update-user-status", setOnlineUsers);
 
         socket.on("call-invitation", ({ from, name }) => {
+            console.log("Receiver: Call invitation received from:", from);
             setVideoCallData({ callerId: from, callerName: name });
             ringingAudio.current.loop = true;
             ringingAudio.current.play().catch(e => console.error("Ringing sound error:", e));
@@ -99,14 +100,18 @@ const Chat = () => {
         });
 
         socket.on("call-accepted", () => {
+            console.log("Caller: Call accepted by receiver. Navigating to video call...");
             setIsCalling(true);
             callingAudio.current.pause();
             callingAudio.current.currentTime = 0;
             toast.dismiss('call');
+            // Check the receiverId here. It should be the ID of the person you called.
+            console.log("Caller's receiverId:", receiverId);
             navigate(`/video/${receiverId}`);
         });
 
         socket.on("call-rejected", () => {
+            console.log("Caller: Call rejected by receiver.");
             setIsCalling(false);
             callingAudio.current.pause();
             callingAudio.current.currentTime = 0;
@@ -214,6 +219,7 @@ const Chat = () => {
     }, [receiverId]);
 
     const handleSelectChat = (selectedUser) => {
+        console.log("Selected chat with user ID:", selectedUser._id);
         localStorage.setItem("lastReceiverId", selectedUser._id);
         localStorage.setItem("lastReceiverName", selectedUser.username);
         setReceiver(selectedUser.username);
@@ -273,6 +279,7 @@ const Chat = () => {
             toast.error("Please select a user to call.");
             return;
         }
+        console.log("Caller: Initiating call to receiverId:", receiverId);
         setIsCalling(true);
         callingAudio.current.loop = true;
         callingAudio.current.play().catch(e => console.error("Calling sound error:", e));
@@ -285,15 +292,17 @@ const Chat = () => {
     };
 
     const acceptCall = () => {
+        console.log("Receiver: Accepting call from callerId:", videoCallData.callerId);
         setIsCalling(true);
         ringingAudio.current.pause();
         ringingAudio.current.currentTime = 0;
-        socket.emit("call-accepted", { to: videoCallData.callerId });
+        socket.emit("call-accepted", { to: videoCallData.callerId, callerId: videoCallData.callerId });
         navigate(`/video/${videoCallData.callerId}`);
         toast.dismiss('call');
     };
 
     const rejectCall = () => {
+        console.log("Receiver: Rejecting call from callerId:", videoCallData.callerId);
         ringingAudio.current.pause();
         ringingAudio.current.currentTime = 0;
         socket.emit("call-rejected", { to: videoCallData.callerId });
