@@ -1,149 +1,266 @@
-/* General Body and Container Styling */
-body {
-    background-color: #f0f2f5;
-    font-family: 'Segoe UI', Arial, sans-serif;
+/* ── Self-contained full-screen scroll wrapper ── */
+.su-page {
+    position: fixed;
+    inset: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    background: #0a0a0f;
+    background-image:
+        radial-gradient(ellipse at 80% 20%, rgba(108, 99, 255, 0.13) 0%, transparent 60%),
+        radial-gradient(ellipse at 20% 80%, rgba(168, 85, 247, 0.09) 0%, transparent 55%);
     display: flex;
-    justify-content: center;
+    flex-direction: column;
     align-items: center;
-    height: 100vh;
-    margin: 0;
-}
-
-.signup-container {
-    width: 100%;
-    max-width: 450px;
-    padding: 20px;
+    justify-content: center;
+    padding: 32px 16px;
     box-sizing: border-box;
-    display: flex;
-    justify-content: center;
-    align-items: center;
+    -webkit-overflow-scrolling: touch;
 }
 
-/* Card Styling */
-.signup-card {
-    background: #ffffff;
-    /* Reduced top and bottom padding for a more compact card */
-    padding: 30px 40px; 
-    border-radius: 12px;
-    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.1);
-    width: 100%;
+/* ── Card ── */
+.su-card {
+    background: rgba(19, 19, 30, 0.97);
+    border: 1px solid rgba(108, 99, 255, 0.22);
+    border-radius: 20px;
+    padding: 40px 38px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
     text-align: center;
+    width: 100%;
+    max-width: 440px;
+    box-sizing: border-box;
 }
 
-.signup-title {
-    font-size: 2rem;
+/* ── Brand ── */
+.su-brand {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    margin-bottom: 18px;
+}
+
+.su-brand-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 11px;
+    background: linear-gradient(135deg, #6c63ff, #a855f7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 19px;
+    box-shadow: 0 4px 14px rgba(108, 99, 255, 0.4);
+    flex-shrink: 0;
+}
+
+.su-brand-name {
+    font-size: 21px;
+    font-weight: 800;
+    background: linear-gradient(135deg, #6c63ff, #a855f7);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    letter-spacing: -0.4px;
+}
+
+/* ── Headings ── */
+.su-title {
+    font-size: 1.4rem;
     font-weight: 700;
-    color: #333;
-    margin-bottom: 5px; /* Reduced margin */
+    color: #e2e8f0;
+    margin: 0 0 6px;
+    letter-spacing: -0.3px;
 }
 
-.signup-subtitle {
-    font-size: 1rem;
-    color: #888;
-    margin-bottom: 25px; /* Reduced margin */
+.su-subtitle {
+    font-size: 0.875rem;
+    color: #64748b;
+    margin: 0 0 22px;
+    line-height: 1.5;
 }
 
-/* Input and Form Styling */
-.input-group-custom {
-    margin-bottom: 15px; /* Reduced margin */
+/* ── Fields ── */
+.su-field {
+    margin-bottom: 13px;
     text-align: left;
 }
 
-.input-label {
+.su-label {
     display: block;
-    font-size: 0.9rem;
-    color: #555;
-    margin-bottom: 8px;
+    font-size: 0.72rem;
+    color: #94a3b8;
+    margin-bottom: 6px;
     font-weight: 600;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
 }
 
-.signup-input {
+.su-input {
+    display: block;
     width: 100%;
-    padding: 12px 15px;
-    border: 1px solid #ddd;
-    border-radius: 8px;
-    font-size: 1rem;
-    transition: all 0.3s ease;
-}
-
-.signup-input:focus {
+    padding: 11px 16px;
+    border: 1px solid #2d2d44;
+    border-radius: 10px;
+    font-size: 16px;
+    background: #1e1e2e;
+    color: #e2e8f0;
     outline: none;
-    border-color: #007bff;
-    box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.15);
+    box-sizing: border-box;
+    transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
+    -webkit-appearance: none;
+    appearance: none;
+    font-family: inherit;
 }
 
-.password-input-wrapper {
-    position: relative;
+.su-input::placeholder { color: #475569; }
+
+.su-input:focus {
+    border-color: #6c63ff;
+    box-shadow: 0 0 0 3px rgba(108, 99, 255, 0.18);
+    background: #1a1a2e;
 }
 
-.password-toggle-icon {
+/* ── Password wrapper ── */
+.su-pw-wrap { position: relative; }
+.su-pw-wrap .su-input { padding-right: 46px; }
+
+.su-eye {
     position: absolute;
-    right: 15px;
+    right: 13px;
     top: 50%;
     transform: translateY(-50%);
     cursor: pointer;
-    color: #999;
-    font-size: 1.1rem;
+    color: #64748b;
+    font-size: 1rem;
+    display: flex;
+    align-items: center;
+    padding: 5px;
+    transition: color 0.2s;
+    -webkit-tap-highlight-color: transparent;
+    line-height: 1;
 }
 
-/* Button Styling */
-.signup-button {
+.su-eye:hover { color: #6c63ff; }
+
+/* ── Button ── */
+.su-btn {
+    display: block;
     width: 100%;
-    padding: 12px;
-    background-color: #007bff;
+    padding: 13px;
+    background: linear-gradient(135deg, #6c63ff, #7c3aed);
     color: #fff;
     border: none;
-    border-radius: 8px;
-    font-size: 1.1rem;
-    font-weight: bold;
+    border-radius: 10px;
+    font-size: 1rem;
+    font-weight: 700;
     cursor: pointer;
-    transition: background-color 0.3s ease, transform 0.2s ease;
     margin-top: 10px;
+    letter-spacing: 0.3px;
+    box-shadow: 0 4px 18px rgba(108, 99, 255, 0.35);
+    transition: opacity 0.2s, transform 0.15s, box-shadow 0.2s;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+    font-family: inherit;
+    box-sizing: border-box;
 }
 
-.signup-button:hover {
-    background-color: #0056b3;
-    transform: translateY(-2px);
+.su-btn:hover {
+    opacity: 0.9;
+    transform: translateY(-1px);
+    box-shadow: 0 6px 22px rgba(108, 99, 255, 0.5);
 }
 
-.signup-button:active {
-    transform: translateY(0);
+.su-btn:active { transform: translateY(0); opacity: 1; }
+
+.su-btn:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
 }
 
-/* Link and Text Styling */
-.login-link {
-    margin-top: 25px;
-    font-size: 0.9rem;
-    color: #555;
+.su-spinner {
+    display: inline-block;
+    width: 18px;
+    height: 18px;
+    border: 2px solid rgba(255,255,255,0.3);
+    border-top-color: #fff;
+    border-radius: 50%;
+    animation: su-spin 0.7s linear infinite;
+    vertical-align: middle;
 }
 
-.login-link a {
-    color: #007bff;
+@keyframes su-spin {
+    to { transform: rotate(360deg); }
+}
+
+/* ── Footer link ── */
+.su-footer {
+    margin: 18px 0 0;
+    font-size: 0.875rem;
+    color: #64748b;
+}
+
+.su-footer a {
+    color: #6c63ff;
     text-decoration: none;
     font-weight: 600;
-    transition: color 0.3s ease;
+    transition: color 0.2s;
 }
 
-.login-link a:hover {
-    color: #0056b3;
+.su-footer a:hover { color: #a855f7; }
+
+/* ════════════════════════════════
+   RESPONSIVE
+════════════════════════════════ */
+
+/* Tablet (≤ 768px) */
+@media (max-width: 768px) {
+    .su-card { max-width: 480px; padding: 34px 28px; }
 }
 
-/* Toastify Container Styling */
-.Toastify__toast-container {
-    z-index: 9999;
-}
-
-/* === Responsive adjustments === */
+/* Mobile (≤ 576px) */
 @media (max-width: 576px) {
-    .signup-card {
-        padding: 30px 20px;
-    }
+    .su-page { padding: 20px 14px; justify-content: flex-start; }
+    .su-card { padding: 26px 18px; border-radius: 16px; max-width: 100%; }
+    .su-title { font-size: 1.2rem; }
+    .su-subtitle { font-size: 0.82rem; margin-bottom: 16px; }
+    .su-field { margin-bottom: 11px; }
+    .su-input { padding: 10px 14px; }
+    .su-btn { padding: 12px; font-size: 0.95rem; }
+    .su-footer { margin-top: 14px; }
+}
 
-    .signup-title {
-        font-size: 1.7rem;
-    }
+/* Small phones (≤ 380px) */
+@media (max-width: 380px) {
+    .su-page { padding: 16px 10px; }
+    .su-card { padding: 22px 14px; border-radius: 14px; }
+    .su-brand-icon { width: 34px; height: 34px; font-size: 16px; }
+    .su-brand-name { font-size: 18px; }
+    .su-title { font-size: 1.1rem; }
+    .su-subtitle { font-size: 0.8rem; margin-bottom: 14px; }
+    .su-label { font-size: 0.68rem; }
+    .su-field { margin-bottom: 10px; }
+    .su-input { padding: 9px 12px; border-radius: 8px; font-size: 15px; }
+    .su-btn { padding: 11px; border-radius: 8px; font-size: 0.9rem; }
+}
 
-    .signup-subtitle {
-        font-size: 0.9rem;
-    }
+/* Landscape phones */
+@media (max-height: 600px) and (orientation: landscape) {
+    .su-page { justify-content: flex-start; padding: 16px 20px; }
+    .su-card { padding: 18px 24px; max-width: 500px; }
+    .su-brand { margin-bottom: 10px; }
+    .su-brand-icon { width: 32px; height: 32px; font-size: 15px; }
+    .su-brand-name { font-size: 18px; }
+    .su-title { font-size: 1.1rem; margin-bottom: 3px; }
+    .su-subtitle { font-size: 0.8rem; margin-bottom: 10px; }
+    .su-field { margin-bottom: 8px; }
+    .su-input { padding: 8px 13px; }
+    .su-btn { padding: 10px; margin-top: 6px; }
+    .su-footer { margin-top: 10px; font-size: 0.82rem; }
+}
+
+/* Large screens (≥ 1200px) */
+@media (min-width: 1200px) {
+    .su-card { padding: 48px 44px; max-width: 460px; }
+    .su-title { font-size: 1.6rem; }
 }

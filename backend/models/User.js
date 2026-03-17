@@ -5,7 +5,8 @@ const userSchema = new mongoose.Schema({
     phoneNumber: { type: Number, required: true, unique: true },
     email: { type: String, required: true, unique: true },
     password: { type: String, required: true },
-    online: { type: Boolean, default: false }
+    online: { type: Boolean, default: false },
+    avatar: { type: String, default: "" }
 });
 
 module.exports = mongoose.model("User", userSchema);
