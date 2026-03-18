@@ -16,6 +16,8 @@ const ICE_SERVERS = {
     ],
 };
 
+const APIURL = `${import.meta.env.VITE_API_URL || "http://localhost:4000"}/api`;
+
 const VideoCall = () => {
     const localVideoRef = useRef(null);
     const remoteVideoRef = useRef(null);
@@ -214,7 +216,7 @@ const VideoCall = () => {
         const content = duration > 0
             ? `📹 Video call ended • ${formatDuration(duration)}`
             : `📹 Video call ended`;
-        fetch("http://localhost:4000/api/chat/send", {
+        fetch(`${APIURL}/chat/send`, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",

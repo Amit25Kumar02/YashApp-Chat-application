@@ -35,6 +35,8 @@ html {
     flex-direction: column;
     transition: transform 0.3s ease;
     z-index: 10;
+    position: relative;
+    overflow: hidden;
 }
 
 .sidebar-header {
@@ -861,6 +863,21 @@ html {
     gap: 6px;
 }
 
+.people-search-input {
+    width: 100%;
+    padding: 7px 12px;
+    border-radius: 16px;
+    border: 1px solid #2d2d44;
+    background: #1a1a2e;
+    color: #e2e8f0;
+    font-size: 12px;
+    outline: none;
+    margin-bottom: 8px;
+    transition: border-color 0.2s;
+}
+.people-search-input:focus { border-color: #6c63ff; }
+.people-search-input::placeholder { color: #475569; }
+
 .people-item {
     display: flex;
     align-items: center;
@@ -941,6 +958,29 @@ html {
     pointer-events: none;
     line-height: 1;
 }
+
+/* ===== FRIENDS SEARCH ===== */
+.friends-search-wrap {
+    padding: 8px 12px 4px;
+    background: #13131e;
+    position: sticky;
+    top: 0;
+    z-index: 2;
+}
+
+.friends-search-input {
+    width: 100%;
+    padding: 8px 14px;
+    border-radius: 20px;
+    border: 1px solid #2d2d44;
+    background: #1e1e2e;
+    color: #e2e8f0;
+    font-size: 13px;
+    outline: none;
+    transition: border-color 0.2s;
+}
+.friends-search-input:focus { border-color: #6c63ff; }
+.friends-search-input::placeholder { color: #475569; }
 
 /* ===== UNFRIEND BUTTON ===== */
 .unfriend-btn {

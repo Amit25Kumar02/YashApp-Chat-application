@@ -4,12 +4,13 @@ import AuthContext from "./authContext";
 import { socket } from "./socket";
 import axios from "axios";
 import EmojiPicker from "emoji-picker-react";
-import { FaSignOutAlt, FaVideo, FaSmile, FaArrowLeft, FaImage, FaPaperPlane, FaPhone, FaPhoneSlash, FaTrash, FaTimes, FaCamera, FaMicrophone, FaStop, FaUserPlus, FaUsers } from "react-icons/fa";
+import { FaSignOutAlt, FaVideo, FaSmile, FaArrowLeft, FaImage, FaPaperPlane, FaPhone, FaPhoneSlash, FaTrash, FaTimes, FaCamera, FaMicrophone, FaStop, FaUserPlus, FaUsers, FaCircle } from "react-icons/fa";
 import { BiCheckDouble, BiCheck } from "react-icons/bi";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import { useNavigate } from "react-router-dom";
 import "./css/chat.css";
+import StatusPanel from "./StatusPanel";
 
 import ringingSound from "../assets/audio/ring.mp3";
 import callingSound from "../assets/audio/calling.mp3";
@@ -75,7 +76,9 @@ const Chat = () => {
     const [showEmojiPicker, setShowEmojiPicker] = useState(false);
     const [showSidebar, setShowSidebar] = useState(true);
     const [videoCallData, setVideoCallData] = useState(null);
+    const [audioCallData, setAudioCallData] = useState(null);
     const [isCalling, setIsCalling] = useState(false);
+    const [isAudioCalling, setIsAudioCalling] = useState(false);
     const [imagePreview, setImagePreview] = useState(null);
     const [imageFile, setImageFile] = useState(null);
     const [isRecording, setIsRecording] = useState(false);
@@ -86,6 +89,9 @@ const Chat = () => {
 
     const [fetchKey, setFetchKey] = useState(0);
     const [showPeople, setShowPeople] = useState(false);
+    const [peopleSearch, setPeopleSearch] = useState("");
+    const [friendSearch, setFriendSearch] = useState("");
+    const [activeTab, setActiveTab] = useState("chats"); // "chats" | "status"
 
     // Message selection
     const [selectedMsgs, setSelectedMsgs] = useState(new Set());
@@ -159,6 +165,28 @@ const Chat = () => {
 
         socket.on("update-user-status", (onlineList) => setOnlineUsers(onlineList));
 
+        socket.on("audio-call-invitation", ({ from, name }) => {
+            setAudioCallData({ callerId: from, callerName: name });
+            ringingAudio.current.loop = true;
+            ringingAudio.current.play().catch(() => {});
+        });
+
+        socket.on("audio-call-accepted", () => {
+            setIsAudioCalling(false);
+            callingAudio.current.pause();
+            callingAudio.current.currentTime = 0;
+            toast.dismiss("audio-calling");
+            navigate(`/audio/${receiverId}?role=caller&name=${encodeURIComponent(receiverName)}`);
+        });
+
+        socket.on("audio-call-rejected", () => {
+            setIsAudioCalling(false);
+            callingAudio.current.pause();
+            callingAudio.current.currentTime = 0;
+            toast.dismiss("audio-calling");
+            toast.error(`${receiverName || "User"} rejected the call.`);
+        });
+
         socket.on("call-invitation", ({ from, name }) => {
             setVideoCallData({ callerId: from, callerName: name });
             ringingAudio.current.loop = true;
@@ -190,6 +218,9 @@ const Chat = () => {
         });
 
         return () => {
+            socket.off("audio-call-invitation");
+            socket.off("audio-call-accepted");
+            socket.off("audio-call-rejected");
             socket.off("update-user-status");
             socket.off("call-invitation");
             socket.off("call-accepted");
@@ -581,6 +612,33 @@ const Chat = () => {
         toast.dismiss();
     };
 
+    const handleAudioCall = () => {
+        if (!receiverId) return;
+        setIsAudioCalling(true);
+        callingAudio.current.loop = true;
+        callingAudio.current.play().catch(() => {});
+        socket.emit("audio-call-invitation", { to: receiverId, from: userProfile._id, name: userProfile.username });
+        toast.info(`Calling ${receiverName}...`, { autoClose: false, closeButton: false, toastId: "audio-calling" });
+    };
+
+    const acceptAudioCall = () => {
+        ringingAudio.current.pause();
+        ringingAudio.current.currentTime = 0;
+        socket.emit("audio-call-accepted", { to: audioCallData.callerId });
+        navigate(`/audio/${audioCallData.callerId}?role=receiver&name=${encodeURIComponent(audioCallData.callerName)}`);
+        setAudioCallData(null);
+        toast.dismiss();
+    };
+
+    const rejectAudioCall = () => {
+        ringingAudio.current.pause();
+        ringingAudio.current.currentTime = 0;
+        socket.emit("audio-call-rejected", { to: audioCallData.callerId });
+        saveCallMessage(audioCallData.callerId, "📵 Missed audio call");
+        setAudioCallData(null);
+        toast.dismiss();
+    };
+
     const handleLogout = () => {
         localStorage.clear();
         setUser(null);
@@ -617,7 +675,22 @@ const Chat = () => {
         <div className="app-container">
             <ToastContainer position="top-right" theme="dark" />
 
-            {/* Incoming Call Modal */}
+            {/* Incoming Audio Call Modal */}
+            {audioCallData && (
+                <div className="call-modal-overlay">
+                    <div className="call-modal">
+                        <div className="call-modal-avatar">{getInitial(audioCallData.callerName)}</div>
+                        <h3>{audioCallData.callerName}</h3>
+                        <p>Incoming audio call...</p>
+                        <div className="call-modal-actions">
+                            <button className="call-btn accept" onClick={acceptAudioCall}><FaPhone /></button>
+                            <button className="call-btn reject" onClick={rejectAudioCall}><FaPhoneSlash /></button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Incoming Video Call Modal */}
             {videoCallData && (
                 <div className="call-modal-overlay">
                     <div className="call-modal">
@@ -644,6 +717,9 @@ const Chat = () => {
                         <span className="sidebar-username">{userProfile.username}</span>
                     </div>
                     <div style={{ display: "flex", gap: 4 }}>
+                        <button className="icon-btn-flat" onClick={() => setActiveTab(t => t === "status" ? "chats" : "status")} title="Status" style={{ position: "relative" }}>
+                            <FaCircle style={{ fontSize: 16 }} />
+                        </button>
                         <button className="icon-btn-flat" onClick={() => setShowPeople(p => !p)} title="Add People" style={{ position: "relative" }}>
                             <FaUserPlus />
                             {allUsers.filter(u => u.sentMeRequest).length > 0 && (
@@ -657,10 +733,20 @@ const Chat = () => {
                 </div>
 
                 {/* Add People / Friend Requests Panel */}
+                {activeTab === "status" ? (
+                    <StatusPanel userProfile={userProfile} onClose={() => setActiveTab("chats")} />
+                ) : (
+                <>
                 {showPeople && (
                     <div className="people-panel">
                         <div className="people-panel-title"><FaUsers /> People</div>
-                        {allUsers.filter(u => !isFriend(u._id)).map(u => (
+                        <input
+                            className="people-search-input"
+                            placeholder="Search people..."
+                            value={peopleSearch}
+                            onChange={e => setPeopleSearch(e.target.value)}
+                        />
+                        {allUsers.filter(u => !isFriend(u._id) && u.username.toLowerCase().includes(peopleSearch.toLowerCase())).map(u => (
                             <div key={u._id} className="people-item">
                                 <div className="contact-avatar-wrap">
                                     <Avatar user={u} size="sm" />
@@ -679,14 +765,22 @@ const Chat = () => {
                                 )}
                             </div>
                         ))}
-                        {allUsers.filter(u => !isFriend(u._id)).length === 0 && (
-                            <p className="people-empty">No new people to add</p>
+                        {allUsers.filter(u => !isFriend(u._id) && u.username.toLowerCase().includes(peopleSearch.toLowerCase())).length === 0 && (
+                            <p className="people-empty">No results found</p>
                         )}
                     </div>
                 )}
 
                 <div className="contact-list">
-                    {allUsers.filter(u => isFriend(u._id)).map(u => {
+                    <div className="friends-search-wrap">
+                        <input
+                            className="friends-search-input"
+                            placeholder="Search friends..."
+                            value={friendSearch}
+                            onChange={e => setFriendSearch(e.target.value)}
+                        />
+                    </div>
+                    {allUsers.filter(u => isFriend(u._id) && u.username.toLowerCase().includes(friendSearch.toLowerCase())).map(u => {
                         const unread = messages.filter(m => m.sender === u._id && !m.read).length;
                         const lastMsg = messages.filter(m => m.sender === u._id || m.receiver === u._id).slice(-1)[0];
                         return (
@@ -706,7 +800,7 @@ const Chat = () => {
                                     </div>
                                     <div className="contact-bottom">
                                         <span className="contact-preview">
-                                            {lastMsg ? (lastMsg.type === "image" ? "📷 Photo" : lastMsg.type === "call" ? "📹 Video call" : lastMsg.content) : "No messages yet"}
+                                            {lastMsg ? (lastMsg.type === "image" ? "📷 Photo" : lastMsg.type === "voice" ? "🎤 Voice" : lastMsg.type === "call" ? (lastMsg.content.includes("audio") || lastMsg.content.includes("📞") ? "📞 Audio call" : "📹 Video call") : lastMsg.content) : "No messages yet"}
                                         </span>
                                         {unread > 0 && <span className="unread-badge">{unread}</span>}
                                     </div>
@@ -715,13 +809,15 @@ const Chat = () => {
                             </div>
                         );
                     })}
-                    {allUsers.filter(u => isFriend(u._id)).length === 0 && !showPeople && (
+                    {allUsers.filter(u => isFriend(u._id) && u.username.toLowerCase().includes(friendSearch.toLowerCase())).length === 0 && !showPeople && (
                         <div className="no-friends-hint">
                             <p>No friends yet.</p>
                             <button className="req-btn req-add" onClick={() => setShowPeople(true)}><FaUserPlus /> Add People</button>
                         </div>
                     )}
                 </div>
+                </>
+                )}
             </aside>
 
             {/* Main Chat */}
@@ -765,9 +861,14 @@ const Chat = () => {
                                         </button>
                                     </>
                                 ) : (
-                                    <button className="icon-btn-flat video-btn" onClick={handleVideoCall} title="Video Call">
-                                        <FaVideo />
-                                    </button>
+                                    <>
+                                        <button className="icon-btn-flat" onClick={handleAudioCall} title="Audio Call">
+                                            <FaPhone />
+                                        </button>
+                                        <button className="icon-btn-flat video-btn" onClick={handleVideoCall} title="Video Call">
+                                            <FaVideo />
+                                        </button>
+                                    </>
                                 )}
                             </div>
                         </div>

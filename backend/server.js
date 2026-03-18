@@ -26,6 +26,7 @@ app.use(express.json());
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 app.use('/api/auth', require('./routes/authRoutes'));
 app.use('/api/chat', require('./routes/chatRoutes'));
+app.use('/api/status', require('./routes/statusRoutes'));
 
 const server = http.createServer(app);
 
@@ -82,7 +83,43 @@ io.on('connection', (socket) => {
     }
   });
 
-  // WebRTC Signaling
+  // Audio Call Signaling
+  socket.on('audio-call-invitation', ({ to, from, name }) => {
+    const receiverSocketId = onlineUsers[to];
+    if (receiverSocketId) io.to(receiverSocketId).emit('audio-call-invitation', { from, name });
+  });
+
+  socket.on('audio-offer', ({ to, from, sdp }) => {
+    const receiverSocketId = onlineUsers[to];
+    if (receiverSocketId) io.to(receiverSocketId).emit('audio-offer', { from, sdp });
+  });
+
+  socket.on('audio-answer', ({ to, sdp }) => {
+    const callerSocketId = onlineUsers[to];
+    if (callerSocketId) io.to(callerSocketId).emit('audio-answer', { sdp });
+  });
+
+  socket.on('audio-ice-candidate', ({ to, candidate }) => {
+    const otherSocketId = onlineUsers[to];
+    if (otherSocketId) io.to(otherSocketId).emit('audio-ice-candidate', { candidate });
+  });
+
+  socket.on('audio-call-accepted', ({ to }) => {
+    const callerSocketId = onlineUsers[to];
+    if (callerSocketId) io.to(callerSocketId).emit('audio-call-accepted');
+  });
+
+  socket.on('audio-call-rejected', ({ to }) => {
+    const callerSocketId = onlineUsers[to];
+    if (callerSocketId) io.to(callerSocketId).emit('audio-call-rejected');
+  });
+
+  socket.on('audio-call-ended', ({ to }) => {
+    const otherSocketId = onlineUsers[to];
+    if (otherSocketId) io.to(otherSocketId).emit('audio-call-ended');
+  });
+
+  // Video Call Signaling
   socket.on('call-invitation', ({ to, from, name }) => {
     const receiverSocketId = onlineUsers[to];
     if (receiverSocketId) io.to(receiverSocketId).emit('call-invitation', { from, name });
