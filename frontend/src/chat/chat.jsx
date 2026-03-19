@@ -6,7 +6,7 @@ import AuthContext from "./authContext";
 import { socket } from "./socket";
 import axios from "axios";
 import EmojiPicker from "emoji-picker-react";
-import { FaSignOutAlt, FaVideo, FaSmile, FaArrowLeft, FaImage, FaPaperPlane, FaPhone, FaPhoneSlash, FaTrash, FaTimes, FaCamera, FaMicrophone, FaStop, FaUserPlus, FaUsers, FaCircle } from "react-icons/fa";
+import { FaSignOutAlt, FaVideo, FaSmile, FaArrowLeft, FaImage, FaPaperPlane, FaPhone, FaPhoneSlash, FaTrash, FaTimes, FaCamera, FaMicrophone, FaStop, FaUserPlus, FaUsers, FaCircle, FaFilm } from "react-icons/fa";
 import { BiCheckDouble, BiCheck } from "react-icons/bi";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
@@ -86,6 +86,7 @@ const Chat = () => {
     const [isAudioCalling, setIsAudioCalling] = useState(false);
     const [imagePreview, setImagePreview] = useState(null);
     const [imageFile, setImageFile] = useState(null);
+    const [mediaFiles, setMediaFiles] = useState([]); // [{file, preview, type}]
     const [isRecording, setIsRecording] = useState(false);
     const [recordingTime, setRecordingTime] = useState(0);
     const mediaRecorderRef = useRef(null);
@@ -471,7 +472,7 @@ const Chat = () => {
 
     // ── Send text ──
     const sendMessage = async () => {
-        if (imageFile) { await sendImage(); return; }
+        if (imageFile || mediaFiles.length) { await sendImage(); return; }
         if (!message.trim() || !receiverId) return;
 
         const tempId = generateTempId();
@@ -492,39 +493,49 @@ const Chat = () => {
         }
     };
 
-    // ── Send image ──
+    // ── Send media (images/videos) ──
     const sendImage = async () => {
-        if (!imageFile || !receiverId) return;
+        if (!mediaFiles.length || !receiverId) return;
         const formData = new FormData();
-        formData.append("image", imageFile);
-        const tempId = generateTempId();
-        setMessages(prev => [...prev, { _id: tempId, sender: userProfile._id, receiver: receiverId, content: imagePreview, type: "image", createdAt: new Date().toISOString() }]);
+        mediaFiles.forEach(m => formData.append("files", m.file));
+        const tempIds = mediaFiles.map(() => generateTempId());
+        mediaFiles.forEach((m, i) => {
+            setMessages(prev => [...prev, { _id: tempIds[i], sender: userProfile._id, receiver: receiverId, content: m.preview, type: m.type, createdAt: new Date().toISOString() }]);
+        });
+        setMediaFiles([]);
         setImagePreview(null);
         setImageFile(null);
         try {
             const uploadRes = await axios.post(`${APIURL}/chat/upload`, formData, {
                 headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
             });
-            const imageUrl = uploadRes.data.url;
-            const res = await axios.post(`${APIURL}/chat/send`,
-                { sender: userProfile._id, receiver: receiverId, content: imageUrl, type: "image" },
-                { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } }
-            );
-            setMessages(prev => prev.map(m => m._id === tempId ? res.data : m));
-            socket.emit("sendMessage", res.data);
+            for (let i = 0; i < uploadRes.data.files.length; i++) {
+                const { url, type } = uploadRes.data.files[i];
+                const res = await axios.post(`${APIURL}/chat/send`,
+                    { sender: userProfile._id, receiver: receiverId, content: url, type },
+                    { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } }
+                );
+                setMessages(prev => prev.map(m => m._id === tempIds[i] ? res.data : m));
+                socket.emit("sendMessage", res.data);
+            }
         } catch {
-            toast.error("Failed to send image");
-            setMessages(prev => prev.filter(m => m._id !== tempId));
+            toast.error("Failed to send media");
+            tempIds.forEach(id => setMessages(prev => prev.filter(m => m._id !== id)));
         }
     };
 
     const handleImageSelect = (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
-        setImageFile(file);
-        const reader = new FileReader();
-        reader.onload = (ev) => setImagePreview(ev.target.result);
-        reader.readAsDataURL(file);
+        const files = Array.from(e.target.files);
+        if (!files.length) return;
+        const newMedia = [];
+        files.forEach(file => {
+            const type = file.type.startsWith("video/") ? "video" : "image";
+            const preview = URL.createObjectURL(file);
+            newMedia.push({ file, preview, type });
+        });
+        setMediaFiles(prev => [...prev, ...newMedia].slice(0, 10));
+        setImageFile(newMedia[0]?.file || null);
+        setImagePreview(newMedia[0]?.preview || null);
         e.target.value = "";
     };
 
@@ -824,7 +835,7 @@ const Chat = () => {
                                     </div>
                                     <div className="contact-bottom">
                                         <span className="contact-preview">
-                                            {lastMsg ? (lastMsg.type === "image" ? "📷 Photo" : lastMsg.type === "voice" ? "🎤 Voice" : lastMsg.type === "call" ? (lastMsg.content.includes("audio") || lastMsg.content.includes("📞") ? "📞 Audio call" : "📹 Video call") : lastMsg.content) : "No messages yet"}
+                                            {lastMsg ? (lastMsg.type === "image" ? "📷 Photo" : lastMsg.type === "video" ? "🎥 Video" : lastMsg.type === "voice" ? "🎤 Voice" : lastMsg.type === "call" ? (lastMsg.content.includes("audio") || lastMsg.content.includes("📞") ? "📞 Audio call" : "📹 Video call") : lastMsg.content) : "No messages yet"}
                                         </span>
                                         {unread > 0 && <span className="unread-badge">{unread}</span>}
                                     </div>
@@ -962,6 +973,14 @@ const Chat = () => {
                                                             {isMine && (msg.read ? <BiCheckDouble className="tick tick-read" /> : <BiCheck className="tick tick-sent" />)}
                                                         </div>
                                                     </div>
+                                                ) : msg.type === "video" ? (
+                                                    <div className="msg-image-wrap">
+                                                        <video src={msg.content} className="msg-image" controls controlsList="nodownload" style={{ maxHeight: 220 }} />
+                                                        <div className="img-meta-overlay">
+                                                            <span className="msg-time">{formatTime(msg.createdAt)}</span>
+                                                            {isMine && (msg.read ? <BiCheckDouble className="tick tick-read" /> : <BiCheck className="tick tick-sent" />)}
+                                                        </div>
+                                                    </div>
                                                 ) : msg.type === "voice" ? (
                                                     <div className="voice-bubble">
                                                         <FaMicrophone className="voice-icon" />
@@ -987,12 +1006,19 @@ const Chat = () => {
                             })}
                         </div>
 
-                        {/* Image Preview */}
-                        {imagePreview && (
+                        {/* Image/Video Preview Bar */}
+                        {mediaFiles.length > 0 && (
                             <div className="image-preview-bar">
-                                <img src={imagePreview} alt="preview" className="preview-thumb" />
-                                <span className="preview-name">{imageFile?.name}</span>
-                                <button className="preview-cancel" onClick={() => { setImagePreview(null); setImageFile(null); }}>✕</button>
+                                {mediaFiles.map((m, i) => (
+                                    <div key={i} style={{ position: "relative", display: "inline-block" }}>
+                                        {m.type === "video"
+                                            ? <video src={m.preview} className="preview-thumb" style={{ objectFit: "cover" }} />
+                                            : <img src={m.preview} alt="preview" className="preview-thumb" />}
+                                        <button className="preview-cancel" style={{ position: "absolute", top: 0, right: 0, padding: "2px 5px" }}
+                                            onClick={() => setMediaFiles(prev => { const n = [...prev]; n.splice(i, 1); if (!n.length) { setImageFile(null); setImagePreview(null); } return n; })}>✕</button>
+                                    </div>
+                                ))}
+                                <button className="preview-cancel" onClick={() => { setMediaFiles([]); setImageFile(null); setImagePreview(null); }}>Clear all</button>
                             </div>
                         )}
 
@@ -1019,16 +1045,16 @@ const Chat = () => {
                                     <>
                                         <button className="icon-btn-flat" onClick={() => setShowEmojiPicker(p => !p)}><FaSmile /></button>
                                         <button className="icon-btn-flat" onClick={() => imageInputRef.current.click()}><FaImage /></button>
-                                        <input type="file" accept="image/*" ref={imageInputRef} style={{ display: "none" }} onChange={handleImageSelect} />
+                                        <input type="file" accept="image/*,video/*" multiple ref={imageInputRef} style={{ display: "none" }} onChange={handleImageSelect} />
                                         <input
                                             className="msg-input"
                                             value={message}
                                             onChange={e => setMessage(e.target.value)}
                                             onKeyDown={e => e.key === "Enter" && !e.shiftKey && sendMessage()}
                                             placeholder="Type a message..."
-                                            disabled={!!imageFile}
+                                            disabled={mediaFiles.length > 0}
                                         />
-                                        {(message.trim() || imageFile) ? (
+                                        {(message.trim() || mediaFiles.length) ? (
                                             <button className="send-btn send-active" onClick={sendMessage}>
                                                 <FaPaperPlane />
                                             </button>

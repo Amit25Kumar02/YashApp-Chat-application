@@ -23,6 +23,16 @@ const imageStorage = new CloudinaryStorage({
 });
 const upload = multer({ storage: imageStorage, limits: { fileSize: 10 * 1024 * 1024 } });
 
+const videoStorage = new CloudinaryStorage({
+    cloudinary,
+    params: async (req, file) => ({
+        folder: "yashapp/chat-videos",
+        resource_type: "video",
+        public_id: Date.now() + "-" + file.originalname.split(".")[0],
+    }),
+});
+const uploadVideo = multer({ storage: videoStorage, limits: { fileSize: 50 * 1024 * 1024 } });
+
 const voiceDir = path.join(__dirname, "../uploads/voices");
 if (!fs.existsSync(voiceDir)) fs.mkdirSync(voiceDir, { recursive: true });
 const voiceStorage = multer.diskStorage({
@@ -37,10 +47,33 @@ router.post("/upload-voice", uploadVoice.single("voice"), (req, res) => {
   res.json({ url: `/uploads/voices/${req.file.filename}` });
 });
 
-// Upload image — now returns Cloudinary URL directly
-router.post("/upload", upload.single("image"), (req, res) => {
-  if (!req.file) return res.status(400).json({ message: "No file uploaded" });
-  res.json({ url: req.file.path });
+// Upload multiple images/videos
+router.post("/upload", (req, res) => {
+  const multi = multer({
+    storage: new CloudinaryStorage({
+      cloudinary,
+      params: async (req, file) => {
+        const isVideo = file.mimetype.startsWith("video/");
+        return {
+          folder: isVideo ? "yashapp/chat-videos" : "yashapp/chat",
+          resource_type: isVideo ? "video" : "image",
+          public_id: Date.now() + "-" + file.originalname.split(".")[0],
+        };
+      },
+    }),
+    limits: { fileSize: 50 * 1024 * 1024 },
+  }).array("files", 10);
+
+  multi(req, res, (err) => {
+    if (err) return res.status(500).json({ message: err.message });
+    if (!req.files?.length) return res.status(400).json({ message: "No files uploaded" });
+    res.json({
+      files: req.files.map(f => ({
+        url: f.path,
+        type: f.mimetype.startsWith("video/") ? "video" : "image",
+      }))
+    });
+  });
 });
 
 // Send a message
