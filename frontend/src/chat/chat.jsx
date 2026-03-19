@@ -1,3 +1,5 @@
+/* eslint-disable no-empty */
+/* eslint-disable no-unused-vars */
 /* eslint-disable react-hooks/exhaustive-deps */
 import { useState, useEffect, useContext, useRef } from "react";
 import AuthContext from "./authContext";
@@ -62,6 +64,8 @@ const Avatar = ({ user, size = "md", className = "" }) => {
         </div>
     );
 };
+
+const sanitize = (text) => text.replace(/</g, "&lt;").replace(/>/g, "&gt;").trim();
 
 const Chat = () => {
     const { setUser } = useContext(AuthContext);
@@ -468,7 +472,7 @@ const Chat = () => {
         if (!message.trim() || !receiverId) return;
 
         const tempId = generateTempId();
-        const data = { sender: userProfile._id, receiver: receiverId, content: message.trim(), type: "text", createdAt: new Date().toISOString() };
+        const data = { sender: userProfile._id, receiver: receiverId, content: sanitize(message), type: "text", createdAt: new Date().toISOString() };
         setMessages(prev => [...prev, { ...data, _id: tempId }]);
         setMessage("");
         setShowEmojiPicker(false);
@@ -576,6 +580,7 @@ const Chat = () => {
     // ── Video call ──
     const handleVideoCall = () => {
         if (!receiverId) return;
+        if (!window.confirm(`Start a video call with ${receiverName}?\n\nThis app uses your camera & microphone only for this call.`)) return;
         setIsCalling(true);
         callingAudio.current.loop = true;
         callingAudio.current.play().catch(() => {});
@@ -620,6 +625,7 @@ const Chat = () => {
 
     const handleAudioCall = () => {
         if (!receiverId) return;
+        if (!window.confirm(`Start an audio call with ${receiverName}?\n\nThis app uses your microphone only for this call.`)) return;
         setIsAudioCalling(true);
         callingAudio.current.loop = true;
         callingAudio.current.play().catch(() => {});
