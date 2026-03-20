@@ -10,7 +10,8 @@ const userSchema = new mongoose.Schema({
     dob: { type: String, default: "" },
     title: { type: String, default: "" },
     friends: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
-    friendRequests: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }]
+    friendRequests: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
+    lastBirthdayWish: { type: String, default: "" }
 });
 
 module.exports = mongoose.model("User", userSchema);

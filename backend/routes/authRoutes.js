@@ -187,6 +187,21 @@ app.put("/profile", async (req, res) => {
     } catch { res.status(500).json({ message: "Server error" }); }
 });
 
+// Forgot password — verify by phone number then reset
+app.post("/forgot-password", async (req, res) => {
+    try {
+        const { phoneNumber, newPassword } = req.body;
+        if (!phoneNumber || !newPassword) return res.status(400).json({ message: "Phone number and new password required" });
+        if (newPassword.length < 6) return res.status(400).json({ message: "Password must be at least 6 characters" });
+        const user = await User.findOne({ phoneNumber });
+        if (!user) return res.status(404).json({ message: "No account found with this phone number" });
+        await User.findByIdAndUpdate(user._id, { password: newPassword });
+        res.json({ message: "Password reset successful" });
+    } catch {
+        res.status(500).json({ message: "Server error" });
+    }
+});
+
 // Unfriend
 app.post("/unfriend", async (req, res) => {
     try {

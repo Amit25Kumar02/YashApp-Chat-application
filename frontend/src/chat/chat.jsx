@@ -804,10 +804,9 @@ const Chat = () => {
 
     const sendCapturedPhoto = () => {
         if (!capturedFile) return;
-        const preview = URL.createObjectURL(capturedFile);
-        setMediaFiles(prev => [...prev, { file: capturedFile, preview, type: "image" }]);
+        setMediaFiles(prev => [...prev, { file: capturedFile, preview: capturedPhoto, type: "image" }]);
         setImageFile(capturedFile);
-        setImagePreview(preview);
+        setImagePreview(capturedPhoto);
         setCapturedPhoto(null);
         setCapturedFile(null);
         setShowCameraModal(false);
@@ -1003,7 +1002,7 @@ const Chat = () => {
                         </div>
                         <img src={capturedPhoto} alt="captured" className="camera-preview-img" />
                         <div className="camera-modal-actions">
-                            <button className="camera-btn camera-retake" onClick={() => { setCapturedPhoto(null); setCapturedFile(null); cameraInputRef.current?.click(); }}>Retake</button>
+                            <button className="camera-btn camera-retake" onClick={() => { setCapturedPhoto(null); setCapturedFile(null); }}>Retake</button>
                             <button className="camera-btn camera-send" onClick={sendCapturedPhoto}><FaPaperPlane /> Send</button>
                         </div>
                     </div>

@@ -194,6 +194,21 @@
 
 .ln-footer a:hover { color: #a855f7; }
 
+.ln-link {
+    color: #6c63ff;
+    font-weight: 600;
+    cursor: pointer;
+    transition: color 0.2s;
+}
+.ln-link:hover { color: #a855f7; }
+
+.ln-forgot {
+    text-align: right;
+    margin-bottom: 8px;
+    margin-top: -6px;
+    font-size: 0.82rem;
+}
+
 /* ── Responsive tweaks ── */
 @media (max-width: 575px) {
     .ln-card {

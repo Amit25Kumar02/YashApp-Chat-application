@@ -189,9 +189,12 @@ const checkBirthdays = async () => {
     const now = new Date();
     const mm = String(now.getMonth() + 1).padStart(2, "0");
     const dd = String(now.getDate()).padStart(2, "0");
-    const todayMD = `${mm}-${dd}`;
-    const users = await User.find({ dob: { $regex: `-${mm}-${dd}$` } }).populate("friends", "_id");
+    const todayStr = `${now.getFullYear()}-${mm}-${dd}`;
+    // Find users whose dob ends with -MM-DD
+    const users = await User.find({ dob: { $regex: `-${mm}-${dd}$` } }).populate("friends", "_id username");
     for (const birthdayUser of users) {
+      // Skip if already wished today
+      if (birthdayUser.lastBirthdayWish === todayStr) continue;
       for (const friend of birthdayUser.friends) {
         const msg = await Message.create({
           sender: friend._id,
@@ -199,13 +202,12 @@ const checkBirthdays = async () => {
           content: `🎂 Happy Birthday, ${birthdayUser.username}! 🎉 Wishing you a wonderful day!`,
           type: "text",
         });
-        // Notify the birthday person
         const birthdaySocket = onlineUsers[String(birthdayUser._id)];
         if (birthdaySocket) io.to(birthdaySocket).emit("receiveMessage", msg);
-        // Also notify the friend so it appears in their chat too
         const friendSocket = onlineUsers[String(friend._id)];
         if (friendSocket) io.to(friendSocket).emit("receiveMessage", msg);
       }
+      await User.findByIdAndUpdate(birthdayUser._id, { lastBirthdayWish: todayStr });
     }
     console.log(`🎂 Birthday check done: ${users.length} birthdays today`);
   } catch (err) {
@@ -213,6 +215,10 @@ const checkBirthdays = async () => {
   }
 };
 
-// Run at startup and then every 24h
-checkBirthdays();
-setInterval(checkBirthdays, 24 * 60 * 60 * 1000);
+// Run every minute, but only execute wishes at 8:00 AM
+setInterval(() => {
+  const now = new Date();
+  if (now.getHours() === 8 && now.getMinutes() === 0) {
+    checkBirthdays();
+  }
+}, 60 * 1000);

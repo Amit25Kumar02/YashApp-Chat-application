@@ -19,12 +19,24 @@ const Signup = () => {
 
     const handleChange = (e) => setUser({ ...user, [e.target.name]: e.target.value });
 
+    const validatePassword = (pw) => {
+        if (pw.length < 6) return "Password must be at least 6 characters.";
+        if (pw.length > 10) return "Password must be at most 10 characters.";
+        if (!/[A-Z]/.test(pw)) return "Password must contain at least one uppercase letter.";
+        if (!/[a-z]/.test(pw)) return "Password must contain at least one lowercase letter.";
+        if (!/[0-9]/.test(pw)) return "Password must contain at least one number.";
+        if (!/[^A-Za-z0-9]/.test(pw)) return "Password must contain at least one special character.";
+        return null;
+    };
+
     const handleSubmit = async (e) => {
         e.preventDefault();
         if (loading) return;
         if (!user.username || !user.phoneNumber || !user.email || !user.password || !user.confirmPassword) {
             toast.error("Please fill in all fields."); return;
         }
+        const pwErr = validatePassword(user.password);
+        if (pwErr) { toast.error(pwErr); return; }
         if (user.password !== user.confirmPassword) {
             toast.error("Passwords do not match."); return;
         }
@@ -81,7 +93,7 @@ const Signup = () => {
                             <input type={showPassword ? "text" : "password"}
                                 name="password" className="su-input"
                                 value={user.password} onChange={handleChange}
-                                placeholder="Enter your password" />
+                                placeholder="6-10 chars, A-Z, a-z, 0-9, @#$" />
                             <span className="su-eye" onClick={() => setShowPassword(p => !p)}>
                                 {showPassword ? <FiEyeOff /> : <FiEye />}
                             </span>
