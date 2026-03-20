@@ -90,6 +90,7 @@ router.get("/calls", async (req, res) => {
     const logs = await Message.find({
       type: "call",
       $or: [{ sender: uid }, { receiver: uid }],
+      deletedFor: { $ne: uid },
     }).sort({ createdAt: -1 }).limit(100);
     res.json(logs);
   } catch (e) {
@@ -119,6 +120,7 @@ router.get("/messages/:receiverId", async (req, res) => {
         { sender: userId, receiver: receiverId },
         { sender: receiverId, receiver: userId },
       ],
+      deletedFor: { $ne: userId },
     }).sort({ createdAt: 1 });
     res.status(200).json(messages);
   } catch (error) {
@@ -151,6 +153,20 @@ router.delete("/message/:messageId", async (req, res) => {
     res.json({ success: true, messageId: req.params.messageId });
   } catch (error) {
     res.status(500).json({ message: "Error deleting message", error });
+  }
+});
+
+// Delete for me only (hides from sender's view, keeps for receiver)
+router.post("/delete-for-me", async (req, res) => {
+  const { messageIds, userId } = req.body;
+  try {
+    await Message.updateMany(
+      { _id: { $in: messageIds } },
+      { $addToSet: { deletedFor: userId } }
+    );
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ message: "Error deleting messages", error });
   }
 });
 

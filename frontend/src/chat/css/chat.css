@@ -1530,5 +1530,58 @@ html {
 .chat-menu-unblock { color: #22c55e; }
 .chat-menu-unblock:hover { background: rgba(34,197,94,0.12) !important; }
 
-/* ===== UNFRIEND BUTTON ===== */
-.unfriend-btn { display: none; }
+/* ===== DELETE SHEET ===== */
+.delete-sheet {
+    background: #1a1a2e;
+    border: 1px solid #2d2d44;
+    border-radius: 20px;
+    padding: 20px 16px 12px;
+    width: 300px;
+    max-width: 92vw;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    animation: slideUp 0.2s ease;
+}
+
+.delete-sheet-title {
+    font-size: 14px;
+    font-weight: 700;
+    color: #94a3b8;
+    text-align: center;
+    margin-bottom: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+
+.delete-sheet-btn {
+    width: 100%;
+    padding: 13px 16px;
+    border-radius: 12px;
+    border: none;
+    background: #2d2d44;
+    color: #e2e8f0;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    text-align: left;
+    transition: background 0.15s;
+}
+.delete-sheet-btn:hover { background: #3a3a55; }
+
+.delete-sheet-all { color: #ef4444; }
+.delete-sheet-all:hover { background: rgba(239,68,68,0.15); }
+
+.delete-sheet-disabled {
+    color: #475569;
+    cursor: not-allowed;
+    opacity: 0.5;
+}
+.delete-sheet-disabled:hover { background: #2d2d44; }
+
+.delete-sheet-cancel {
+    color: #6c63ff;
+    margin-top: 4px;
+    text-align: center;
+}
+.delete-sheet-cancel:hover { background: rgba(108,99,255,0.12); }

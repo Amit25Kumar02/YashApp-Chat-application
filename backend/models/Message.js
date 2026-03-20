@@ -6,6 +6,7 @@ const messageSchema = new mongoose.Schema({
   content: { type: String, required: false },
   type: { type: String, enum: ['text', 'image', 'emoji', 'call', 'voice', 'video'], default: 'text' },
   read: { type: Boolean, default: false },
+  deletedFor: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
   createdAt: { type: Date, default: Date.now }
 });
 

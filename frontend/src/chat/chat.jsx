@@ -118,6 +118,7 @@ const Chat = () => {
     const [selectMode, setSelectMode] = useState(false);
     const [showMenu, setShowMenu] = useState(false);
     const [showChatMenu, setShowChatMenu] = useState(false);
+    const [deleteSheet, setDeleteSheet] = useState(null); // { msg } or null
 
     const chatRef = useRef(null);
     const imageInputRef = useRef(null);
@@ -543,11 +544,24 @@ const Chat = () => {
     const cancelSelect = () => {
         setSelectMode(false);
         setSelectedMsgs(new Set());
+        setDeleteSheet(null);
     };
 
-    const deleteSelected = async () => {
-        const ids = [...selectedMsgs];
-        if (!ids.length) return;
+    const withinOneHour = (createdAt) => (Date.now() - new Date(createdAt).getTime()) < 60 * 60 * 1000;
+
+    const deleteForMe = async (ids) => {
+        try {
+            await axios.post(`${APIURL}/chat/delete-for-me`,
+                { messageIds: ids, userId: userProfile._id },
+                { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } }
+            );
+            setMessages(prev => prev.filter(m => !ids.includes(m._id)));
+            setDeleteSheet(null);
+            cancelSelect();
+        } catch { toast.error("Failed to delete."); }
+    };
+
+    const deleteForAll = async (ids) => {
         try {
             await axios.post(`${APIURL}/chat/delete-many`,
                 { messageIds: ids },
@@ -555,10 +569,38 @@ const Chat = () => {
             );
             setMessages(prev => prev.filter(m => !ids.includes(m._id)));
             socket.emit("deleteMessages", { messageIds: ids, receiverId });
+            setDeleteSheet(null);
             cancelSelect();
-        } catch {
-            toast.error("Failed to delete messages.");
-        }
+        } catch { toast.error("Failed to delete."); }
+    };
+
+    const clearChat = async () => {
+        if (!window.confirm("Clear all messages? This will only clear on your side.")) return;
+        const ids = messages.map(m => m._id).filter(Boolean);
+        if (!ids.length) return;
+        try {
+            await axios.post(`${APIURL}/chat/delete-for-me`,
+                { messageIds: ids, userId: userProfile._id },
+                { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } }
+            );
+            setMessages([]);
+            setAllCallLogs(prev => prev.filter(log => {
+                const friendId = log.sender === userProfile._id ? log.receiver : log.sender;
+                return friendId !== receiverId;
+            }));
+            setShowChatMenu(false);
+            toast.success("Chat cleared.");
+        } catch { toast.error("Failed to clear chat."); }
+    };
+
+    // Called when trash icon clicked in select mode
+    const handleDeleteSelected = () => {
+        const ids = [...selectedMsgs];
+        if (!ids.length) return;
+        const selectedMessages = messages.filter(m => ids.includes(m._id));
+        const allMine = selectedMessages.every(m => m.sender === userProfile._id);
+        const allWithinHour = selectedMessages.every(m => withinOneHour(m.createdAt));
+        setDeleteSheet({ ids, allMine, allWithinHour });
     };
 
     // ── Send text ──
@@ -881,6 +923,31 @@ const Chat = () => {
     return (
         <div className="app-container">
             <ToastContainer position="top-right" theme="dark" />
+
+            {/* Delete Sheet */}
+            {deleteSheet && (
+                <div className="call-modal-overlay" onClick={() => setDeleteSheet(null)}>
+                    <div className="delete-sheet" onClick={e => e.stopPropagation()}>
+                        <p className="delete-sheet-title">
+                            Delete {deleteSheet.ids?.length > 1 ? `${deleteSheet.ids.length} messages` : "message"}?
+                        </p>
+                        <button className="delete-sheet-btn" onClick={() => deleteForMe(deleteSheet.ids)}>
+                            🗑 Delete for Me
+                        </button>
+                        {deleteSheet.allMine && deleteSheet.allWithinHour && (
+                            <button className="delete-sheet-btn delete-sheet-all" onClick={() => deleteForAll(deleteSheet.ids)}>
+                                🗑 Delete for All
+                            </button>
+                        )}
+                        {deleteSheet.allMine && !deleteSheet.allWithinHour && (
+                            <button className="delete-sheet-btn delete-sheet-disabled" disabled>
+                                🗑 Delete for All (1hr limit expired)
+                            </button>
+                        )}
+                        <button className="delete-sheet-btn delete-sheet-cancel" onClick={() => setDeleteSheet(null)}>Cancel</button>
+                    </div>
+                </div>
+            )}
 
             {/* Incoming Audio Call Modal */}
             {audioCallData && (
@@ -1278,7 +1345,7 @@ const Chat = () => {
                                 {selectMode ? (
                                     <>
                                         <span className="select-count">{selectedMsgs.size} selected</span>
-                                        <button className="icon-btn-flat delete-btn" onClick={deleteSelected} disabled={selectedMsgs.size === 0} title="Delete selected">
+                                        <button className="icon-btn-flat delete-btn" onClick={handleDeleteSelected} disabled={selectedMsgs.size === 0} title="Delete">
                                             <FaTrash />
                                         </button>
                                         <button className="icon-btn-flat" onClick={cancelSelect} title="Cancel">
@@ -1299,6 +1366,10 @@ const Chat = () => {
                                             </button>
                                             {showChatMenu && (
                                                 <div className="chat-header-menu">
+                                                    <button className="sidebar-menu-item" onClick={clearChat}>
+                                                        <FaTrash /> Clear Chat
+                                                    </button>
+                                                    <div className="sidebar-menu-divider" />
                                                     <button className="sidebar-menu-item" onClick={() => { unfriend(receiverId); setShowChatMenu(false); }}>
                                                         <FaTimes /> Unfriend
                                                     </button>
@@ -1321,7 +1392,7 @@ const Chat = () => {
                         </div>
 
                         {/* Messages */}
-                        <div className={`chat-body${selectMode ? " select-mode" : ""}`} ref={chatRef} style={selectMode ? { userSelect: 'none' } : {}}>
+                        <div className="chat-body" ref={chatRef}>
                             {messagesLoading ? (
                                 Array.from({ length: 6 }).map((_, i) => (
                                     <div key={i} className={`msg-row ${i % 2 === 0 ? "msg-mine" : "msg-theirs"}`} style={{ pointerEvents: "none" }}>
@@ -1362,8 +1433,8 @@ const Chat = () => {
                                     <div key={msg._id || i}>
                                         {showDivider && <div className="date-divider"><span>{formatDateDivider(msg.createdAt)}</span></div>}
                                         <div
-                                            className={`msg-row ${isMine ? "msg-mine" : "msg-theirs"} ${isSelected ? "msg-selected" : ""}`}
-                                            onClick={() => handleMsgClick(msg)}
+                                            className={`msg-row ${isMine ? "msg-mine" : "msg-theirs"} ${isSelected ? "msg-selected" : ""} ${selectMode ? "select-mode-row" : ""}`}
+                                            onClick={() => { if (longPressFired.current) { longPressFired.current = false; return; } if (selectMode) toggleSelectMsg(msg._id); }}
                                             onPointerDown={() => onPointerDown(msg)}
                                             onPointerUp={onPointerUp}
                                             onPointerLeave={onPointerUp}
