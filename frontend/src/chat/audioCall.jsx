@@ -102,14 +102,17 @@ const AudioCall = () => {
     const cleanup = (notify = true) => {
         clearInterval(durationRef.current);
         if (remoteAudioRef.current) {
-                remoteAudioRef.current.pause();
-                remoteAudioRef.current.srcObject = null;
-            }
+            remoteAudioRef.current.pause();
+            remoteAudioRef.current.srcObject = null;
+        }
         if (localStreamRef.current) {
             localStreamRef.current.getTracks().forEach(t => t.stop());
             localStreamRef.current = null;
         }
         if (pcRef.current) {
+            pcRef.current.ontrack = null;
+            pcRef.current.onicecandidate = null;
+            pcRef.current.onconnectionstatechange = null;
             pcRef.current.close();
             pcRef.current = null;
         }
@@ -195,6 +198,9 @@ const AudioCall = () => {
             socket.off("audio-ice-candidate", handleIce);
             socket.off("audio-call-ended", handleCallEnded);
             cleanup(false);
+            // Re-register online so chat page socket works correctly
+            const myId = localStorage.getItem("myUserId");
+            if (myId) socket.emit("user-online", myId);
         };
     }, []);
 

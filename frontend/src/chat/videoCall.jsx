@@ -71,7 +71,7 @@ const VideoCall = () => {
         remoteStreamRef.current = stream;
         if (remoteVideoRef.current) {
             remoteVideoRef.current.srcObject = stream;
-            remoteVideoRef.current.play().catch(() => {});
+            remoteVideoRef.current.play().catch(() => { });
         }
         setHasRemoteStream(true);
         setCallEstablished(true);
@@ -81,7 +81,7 @@ const VideoCall = () => {
         remoteVideoRef.current = node;
         if (node && remoteStreamRef.current) {
             node.srcObject = remoteStreamRef.current;
-            node.play().catch(() => {});
+            node.play().catch(() => { });
         }
     }, []);
 
@@ -136,6 +136,10 @@ const VideoCall = () => {
             localStreamRef.current = null;
         }
         if (pcRef.current) {
+            pcRef.current.ontrack = null;
+            pcRef.current.onicecandidate = null;
+            pcRef.current.oniceconnectionstatechange = null;
+            pcRef.current.onconnectionstatechange = null;
             pcRef.current.close();
             pcRef.current = null;
         }
@@ -228,6 +232,8 @@ const VideoCall = () => {
             socket.off("ice-candidate", handleIceCandidate);
             socket.off("call-ended", handleCallEnded);
             cleanup(false);
+            const myId = localStorage.getItem("myUserId");
+            if (myId) socket.emit("user-online", myId);
         };
     }, []);
 
@@ -252,7 +258,7 @@ const VideoCall = () => {
             method: "POST",
             headers: { "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("token")}` },
             body: JSON.stringify({ sender: myId, receiver: receiverId, content, type: "call" }),
-        }).then(r => r.json()).then(saved => socket.emit("sendMessage", saved)).catch(() => {});
+        }).then(r => r.json()).then(saved => socket.emit("sendMessage", saved)).catch(() => { });
         navigate("/chat");
     };
 
@@ -290,7 +296,7 @@ const VideoCall = () => {
                 className="vc-remote"
                 autoPlay playsInline
                 muted={swapped}
-                onClick={() => swapped && setSwapped(false)}
+                onClick={() => setSwapped(prev => !prev)}
             />
 
             {!hasRemoteStream && (
@@ -324,7 +330,10 @@ const VideoCall = () => {
                 autoPlay playsInline
                 muted={!swapped}
                 style={{ right: pipPos.right, bottom: pipPos.bottom, left: "unset", top: "unset" }}
-                onClick={() => { if (!dragRef.current?.didDrag) setSwapped(p => !p); }}
+                onClick={() => {
+                    if (dragRef.current?.didDrag) return;
+                    setSwapped(prev => !prev);
+                }}
                 onMouseDown={(e) => {
                     e.preventDefault();
                     const startX = e.clientX, startY = e.clientY;

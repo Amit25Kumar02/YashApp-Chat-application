@@ -16,6 +16,8 @@
     height: 100%;
     object-fit: cover;
     background: #111;
+    transition: all 0.3s ease;
+    cursor: pointer;
 }
 
 /* ===== LOCAL VIDEO (PiP) ===== */
@@ -32,6 +34,7 @@
     cursor: grab;
     user-select: none;
     touch-action: none;
+    transition: all 0.3s ease;
 }
 
 .vc-local:active { cursor: grabbing; }
