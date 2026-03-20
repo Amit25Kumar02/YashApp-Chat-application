@@ -202,6 +202,36 @@ app.post("/forgot-password", async (req, res) => {
     }
 });
 
+// Block user
+app.post("/block", async (req, res) => {
+    try {
+        const token = req.headers.authorization.split(" ")[1];
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        const { blockId } = req.body;
+        await User.findByIdAndUpdate(decoded.id, { $addToSet: { blockedUsers: blockId } });
+        const io = req.app.get("io");
+        const onlineUsers = req.app.get("onlineUsers");
+        const targetSocket = onlineUsers[blockId];
+        if (io && targetSocket) io.to(targetSocket).emit("blocked-by", { by: decoded.id });
+        res.json({ message: "Blocked" });
+    } catch { res.status(500).json({ message: "Server error" }); }
+});
+
+// Unblock user
+app.post("/unblock", async (req, res) => {
+    try {
+        const token = req.headers.authorization.split(" ")[1];
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        const { unblockId } = req.body;
+        await User.findByIdAndUpdate(decoded.id, { $pull: { blockedUsers: unblockId } });
+        const io = req.app.get("io");
+        const onlineUsers = req.app.get("onlineUsers");
+        const targetSocket = onlineUsers[unblockId];
+        if (io && targetSocket) io.to(targetSocket).emit("unblocked-by", { by: decoded.id });
+        res.json({ message: "Unblocked" });
+    } catch { res.status(500).json({ message: "Server error" }); }
+});
+
 // Unfriend
 app.post("/unfriend", async (req, res) => {
     try {

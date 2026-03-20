@@ -117,6 +117,7 @@ const Chat = () => {
     const [selectedMsgs, setSelectedMsgs] = useState(new Set());
     const [selectMode, setSelectMode] = useState(false);
     const [showMenu, setShowMenu] = useState(false);
+    const [showChatMenu, setShowChatMenu] = useState(false);
 
     const chatRef = useRef(null);
     const imageInputRef = useRef(null);
@@ -181,11 +182,21 @@ const Chat = () => {
         };
         socket.on("friend-request", handleFriendRequest);
         socket.on("friend-accepted", handleFriendAccepted);
+        const handleBlockedBy = ({ by }) => {
+            setAllUsers(prev => prev.map(u => u._id === by ? { ...u, blockedUsers: [...(u.blockedUsers || []), userProfile._id] } : u));
+        };
+        const handleUnblockedBy = ({ by }) => {
+            setAllUsers(prev => prev.map(u => u._id === by ? { ...u, blockedUsers: (u.blockedUsers || []).filter(id => String(id) !== String(userProfile._id)) } : u));
+        };
         socket.on("unfriended", handleUnfriended);
+        socket.on("blocked-by", handleBlockedBy);
+        socket.on("unblocked-by", handleUnblockedBy);
         return () => {
             socket.off("friend-request", handleFriendRequest);
             socket.off("friend-accepted", handleFriendAccepted);
             socket.off("unfriended", handleUnfriended);
+            socket.off("blocked-by", handleBlockedBy);
+            socket.off("unblocked-by", handleUnblockedBy);
         };
     }, [userProfile._id]);
 
@@ -343,6 +354,8 @@ const Chat = () => {
 
     const isFriend = (uid) => (userProfile.friends || []).map(String).includes(String(uid));
     const hasSentRequest = (uid) => (allUsers.find(u => u._id === uid)?.friendRequests || []).map(String).includes(String(userProfile._id));
+    const isBlocked = (uid) => (userProfile.blockedUsers || []).map(String).includes(String(uid));
+    const isBlockedByThem = (uid) => (allUsers.find(u => u._id === uid)?.blockedUsers || []).map(String).includes(String(userProfile._id));
 
     const sendFriendRequest = async (toId) => {
         try {
@@ -388,6 +401,27 @@ const Chat = () => {
         } catch {
             toast.error("Failed to reject request");
         }
+    };
+
+    const blockUser = async (blockId) => {
+        try {
+            await axios.post(`${APIURL}/auth/block`, { blockId }, {
+                headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
+            });
+            setUserProfile(prev => ({ ...prev, blockedUsers: [...(prev.blockedUsers || []), blockId] }));
+            if (receiverId === blockId) handleBackClick();
+            toast.success("User blocked.");
+        } catch { toast.error("Failed to block."); }
+    };
+
+    const unblockUser = async (unblockId) => {
+        try {
+            await axios.post(`${APIURL}/auth/unblock`, { unblockId }, {
+                headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
+            });
+            setUserProfile(prev => ({ ...prev, blockedUsers: (prev.blockedUsers || []).filter(id => String(id) !== String(unblockId)) }));
+            toast.success("User unblocked.");
+        } catch { toast.error("Failed to unblock."); }
     };
 
     const unfriend = async (friendId) => {
@@ -531,6 +565,8 @@ const Chat = () => {
     const sendMessage = async () => {
         if (imageFile || mediaFiles.length) { await sendImage(); return; }
         if (!message.trim() || !receiverId) return;
+        if (isBlocked(receiverId)) { toast.error("You have blocked this user."); return; }
+        if (isBlockedByThem(receiverId)) { toast.error("You cannot send messages to this user."); return; }
 
         const tempId = generateTempId();
         const data = { sender: userProfile._id, receiver: receiverId, content: sanitize(message), type: "text", createdAt: new Date().toISOString() };
@@ -651,6 +687,7 @@ const Chat = () => {
     // ── Video call ──
     const handleVideoCall = () => {
         if (!receiverId) return;
+        if (isBlocked(receiverId) || isBlockedByThem(receiverId)) { toast.error("Cannot call this user."); return; }
         if (!window.confirm(`Start a video call with ${receiverName}?\n\nThis app uses your camera & microphone only for this call.`)) return;
         setIsCalling(true);
         callingAudio.current.loop = true;
@@ -695,6 +732,7 @@ const Chat = () => {
 
     const handleAudioCall = () => {
         if (!receiverId) return;
+        if (isBlocked(receiverId) || isBlockedByThem(receiverId)) { toast.error("Cannot call this user."); return; }
         if (!window.confirm(`Start an audio call with ${receiverName}?\n\nThis app uses your microphone only for this call.`)) return;
         setIsAudioCalling(true);
         callingAudio.current.loop = true;
@@ -751,10 +789,11 @@ const Chat = () => {
         const close = (e) => {
             if (showMenu && !e.target.closest(".sidebar-menu-wrap")) setShowMenu(false);
             if (showAttachMenu && !e.target.closest(".attach-wrap")) setShowAttachMenu(false);
+            if (showChatMenu && !e.target.closest(".chat-menu-wrap")) setShowChatMenu(false);
         };
         document.addEventListener("mousedown", close);
         return () => document.removeEventListener("mousedown", close);
-    }, [showMenu, showAttachMenu]);
+    }, [showMenu, showAttachMenu, showChatMenu]);
 
     const openCamera = async () => {
         // Desktop only — mobile uses inline label input
@@ -1103,7 +1142,7 @@ const Chat = () => {
                                             {unread > 0 && <span className="unread-badge">{unread}</span>}
                                         </div>
                                     </div>
-                                    <button className="unfriend-btn" title="Unfriend" onClick={e => { e.stopPropagation(); unfriend(u._id); }}>✕</button>
+
                                 </div>
                             );
                         })}
@@ -1254,6 +1293,28 @@ const Chat = () => {
                                         <button className="icon-btn-flat video-btn" onClick={handleVideoCall} title="Video Call">
                                             <FaVideo />
                                         </button>
+                                        <div className="chat-menu-wrap">
+                                            <button className="icon-btn-flat" onClick={e => { e.stopPropagation(); setShowChatMenu(p => !p); }} title="More">
+                                                <FaEllipsisV />
+                                            </button>
+                                            {showChatMenu && (
+                                                <div className="chat-header-menu">
+                                                    <button className="sidebar-menu-item" onClick={() => { unfriend(receiverId); setShowChatMenu(false); }}>
+                                                        <FaTimes /> Unfriend
+                                                    </button>
+                                                    <div className="sidebar-menu-divider" />
+                                                    {isBlocked(receiverId) ? (
+                                                        <button className="sidebar-menu-item chat-menu-unblock" onClick={() => { unblockUser(receiverId); setShowChatMenu(false); }}>
+                                                            <FaUserPlus /> Unblock
+                                                        </button>
+                                                    ) : (
+                                                        <button className="sidebar-menu-item chat-menu-block" onClick={() => { blockUser(receiverId); setShowChatMenu(false); }}>
+                                                            <FaPhoneSlash /> Block
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            )}
+                                        </div>
                                     </>
                                 )}
                             </div>

@@ -1525,22 +1525,10 @@ html {
     flex-shrink: 0;
 }
 
-/* ===== UNFRIEND BUTTON ===== */
-.unfriend-btn {
-    background: transparent;
-    border: none;
-    color: #475569;
-    font-size: 13px;
-    cursor: pointer;
-    padding: 4px 6px;
-    border-radius: 6px;
-    flex-shrink: 0;
-    opacity: 0;
-    transition: opacity 0.2s, color 0.2s, background 0.2s;
-}
-.contact-item:hover .unfriend-btn { opacity: 1; }
-.unfriend-btn:hover { color: #ef4444; background: rgba(239,68,68,0.12); }
+.chat-menu-block { color: #ef4444; }
+.chat-menu-block:hover { background: rgba(239,68,68,0.12) !important; }
+.chat-menu-unblock { color: #22c55e; }
+.chat-menu-unblock:hover { background: rgba(34,197,94,0.12) !important; }
 
-@media (max-width: 768px) {
-    .unfriend-btn { opacity: 1; }
-}
+/* ===== UNFRIEND BUTTON ===== */
+.unfriend-btn { display: none; }
