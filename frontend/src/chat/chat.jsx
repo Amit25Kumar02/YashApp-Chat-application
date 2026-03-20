@@ -189,7 +189,6 @@ const Chat = () => {
             setIsAudioCalling(false);
             callingAudio.current.pause();
             callingAudio.current.currentTime = 0;
-            toast.dismiss("audio-calling");
             navigate(`/audio/${receiverId}?role=caller&name=${encodeURIComponent(receiverName)}`);
         });
 
@@ -197,7 +196,6 @@ const Chat = () => {
             setIsAudioCalling(false);
             callingAudio.current.pause();
             callingAudio.current.currentTime = 0;
-            toast.dismiss("audio-calling");
             toast.error(`${receiverName || "User"} rejected the call.`);
         });
 
@@ -207,11 +205,22 @@ const Chat = () => {
             ringingAudio.current.play().catch(() => {});
         });
 
+        socket.on("call-cancelled", () => {
+            setVideoCallData(null);
+            ringingAudio.current.pause();
+            ringingAudio.current.currentTime = 0;
+        });
+
+        socket.on("audio-call-cancelled", () => {
+            setAudioCallData(null);
+            ringingAudio.current.pause();
+            ringingAudio.current.currentTime = 0;
+        });
+
         socket.on("call-accepted", () => {
             setIsCalling(false);
             callingAudio.current.pause();
             callingAudio.current.currentTime = 0;
-            toast.dismiss("calling");
             navigate(`/video/${receiverId}?role=caller`);
         });
 
@@ -219,7 +228,6 @@ const Chat = () => {
             setIsCalling(false);
             callingAudio.current.pause();
             callingAudio.current.currentTime = 0;
-            toast.dismiss("calling");
             toast.error(`${receiverName || "User"} rejected the call.`);
         });
 
@@ -235,10 +243,12 @@ const Chat = () => {
             socket.off("audio-call-invitation");
             socket.off("audio-call-accepted");
             socket.off("audio-call-rejected");
+            socket.off("audio-call-cancelled");
             socket.off("update-user-status");
             socket.off("call-invitation");
             socket.off("call-accepted");
             socket.off("call-rejected");
+            socket.off("call-cancelled");
             socket.off("messageRead");
             socket.off("messagesDeleted");
             callingAudio.current.pause();
@@ -599,7 +609,6 @@ const Chat = () => {
         callingAudio.current.loop = true;
         callingAudio.current.play().catch(() => {});
         socket.emit("call-invitation", { to: receiverId, from: userProfile._id, name: userProfile.username });
-        toast.info(`Calling ${receiverName}...`, { autoClose: false, closeButton: false, toastId: "calling" });
     };
 
     const acceptCall = () => {
@@ -644,7 +653,6 @@ const Chat = () => {
         callingAudio.current.loop = true;
         callingAudio.current.play().catch(() => {});
         socket.emit("audio-call-invitation", { to: receiverId, from: userProfile._id, name: userProfile.username });
-        toast.info(`Calling ${receiverName}...`, { autoClose: false, closeButton: false, toastId: "audio-calling" });
     };
 
     const acceptAudioCall = () => {
@@ -663,6 +671,20 @@ const Chat = () => {
         saveCallMessage(audioCallData.callerId, "📵 Missed audio call");
         setAudioCallData(null);
         toast.dismiss();
+    };
+
+    const cancelVideoCall = () => {
+        setIsCalling(false);
+        callingAudio.current.pause();
+        callingAudio.current.currentTime = 0;
+        socket.emit("call-cancelled", { to: receiverId });
+    };
+
+    const cancelAudioCall = () => {
+        setIsAudioCalling(false);
+        callingAudio.current.pause();
+        callingAudio.current.currentTime = 0;
+        socket.emit("audio-call-cancelled", { to: receiverId });
     };
 
     const handleLogout = () => {
@@ -726,6 +748,34 @@ const Chat = () => {
                         <div className="call-modal-actions">
                             <button className="call-btn accept" onClick={acceptCall}><FaPhone /></button>
                             <button className="call-btn reject" onClick={rejectCall}><FaPhoneSlash /></button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Outgoing Video Call Modal */}
+            {isCalling && (
+                <div className="call-modal-overlay">
+                    <div className="call-modal">
+                        <div className="call-modal-avatar calling-pulse">{getInitial(receiverName)}</div>
+                        <h3>{receiverName}</h3>
+                        <p>Calling...</p>
+                        <div className="call-modal-actions">
+                            <button className="call-btn reject" onClick={cancelVideoCall}><FaPhoneSlash /></button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Outgoing Audio Call Modal */}
+            {isAudioCalling && (
+                <div className="call-modal-overlay">
+                    <div className="call-modal">
+                        <div className="call-modal-avatar calling-pulse">{getInitial(receiverName)}</div>
+                        <h3>{receiverName}</h3>
+                        <p>Calling...</p>
+                        <div className="call-modal-actions">
+                            <button className="call-btn reject" onClick={cancelAudioCall}><FaPhoneSlash /></button>
                         </div>
                     </div>
                 </div>

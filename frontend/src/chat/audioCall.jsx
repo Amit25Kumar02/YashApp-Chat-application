@@ -245,7 +245,8 @@ const AudioCall = () => {
                 {callEstablished && <div className="ac-wave"><span /><span /><span /><span /><span /></div>}
             </div>
             <div className="ac-controls">
-                <button className={`ac-btn ${isMuted ? "ac-btn-muted" : ""}`} onClick={toggleMute} title={isMuted ? "Unmute" : "Mute"}>
+                <button className={`ac-btn ${isMuted ? "ac-btn-muted" : ""}`} onClick={toggleMute} title={isMuted ? "Unmute" : "Mute"}
+                    style={!callEstablished ? { visibility: "hidden" } : {}}>
                     {isMuted ? <FaMicrophoneSlash /> : <FaMicrophone />}
                 </button>
                 <button className="ac-btn ac-btn-end" onClick={endCall} title="End Call">

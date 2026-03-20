@@ -2,7 +2,7 @@
 import { useRef, useEffect, useState, useCallback } from "react";
 import { socket } from "./socket";
 import "./videocall.css";
-import { FaMicrophoneSlash, FaMicrophone, FaVideoSlash, FaVideo } from "react-icons/fa";
+import { FaMicrophoneSlash, FaMicrophone, FaVideoSlash, FaVideo, FaCameraRotate } from "react-icons/fa6";
 import { MdCallEnd } from "react-icons/md";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "react-toastify";
@@ -54,6 +54,8 @@ const VideoCall = () => {
     const [isCameraOff, setIsCameraOff] = useState(false);
     const [callDuration, setCallDuration] = useState(0);
     const [hasRemoteStream, setHasRemoteStream] = useState(false);
+    const [swapped, setSwapped] = useState(false);
+    const [facingMode, setFacingMode] = useState("user");
     const durationRef = useRef(null);
 
     const { receiverId } = useParams();
@@ -262,14 +264,51 @@ const VideoCall = () => {
         if (tracks?.length) { tracks[0].enabled = !tracks[0].enabled; setIsCameraOff(p => !p); }
     };
 
+    const flipCamera = async () => {
+        const newFacing = facingMode === "user" ? "environment" : "user";
+        try {
+            const newStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: newFacing }, audio: true });
+            const newVideoTrack = newStream.getVideoTracks()[0];
+            const sender = getPC()?.getSenders().find(s => s.track?.kind === "video");
+            if (sender) await sender.replaceTrack(newVideoTrack);
+            localStreamRef.current.getVideoTracks().forEach(t => t.stop());
+            localStreamRef.current.removeTrack(localStreamRef.current.getVideoTracks()[0]);
+            localStreamRef.current.addTrack(newVideoTrack);
+            if (localVideoRef.current) localVideoRef.current.srcObject = localStreamRef.current;
+            setFacingMode(newFacing);
+        } catch (err) {
+            toast.error("Could not flip camera.");
+        }
+    };
+
     return (
         <div className="vc-container">
-            <video ref={remoteVideoCallbackRef} className="vc-remote" autoPlay playsInline />
+            <video
+                ref={swapped ? localVideoRef : remoteVideoCallbackRef}
+                className="vc-remote"
+                autoPlay playsInline
+                muted={swapped}
+                onClick={() => swapped && setSwapped(false)}
+            />
 
             {!hasRemoteStream && (
                 <div className="vc-waiting">
                     <div className="vc-waiting-avatar">📞</div>
                     <p>{role === "caller" ? "Calling..." : "Connecting..."}</p>
+                    <div className="vc-controls vc-controls-waiting">
+                        <button className={`vc-btn ${isMuted ? "vc-btn-active" : ""}`} onClick={toggleMute}>
+                            {isMuted ? <FaMicrophoneSlash /> : <FaMicrophone />}
+                        </button>
+                        <button className="vc-btn vc-btn-end" onClick={endCall}>
+                            <MdCallEnd />
+                        </button>
+                        <button className={`vc-btn ${isCameraOff ? "vc-btn-active" : ""}`} onClick={toggleCamera}>
+                            {isCameraOff ? <FaVideoSlash /> : <FaVideo />}
+                        </button>
+                        <button className="vc-btn" onClick={flipCamera}>
+                            <FaCameraRotate />
+                        </button>
+                    </div>
                 </div>
             )}
 
@@ -277,7 +316,13 @@ const VideoCall = () => {
                 <div className="vc-timer">{formatDuration(callDuration)}</div>
             )}
 
-            <video ref={localVideoRef} className="vc-local" autoPlay playsInline muted />
+            <video
+                ref={swapped ? remoteVideoCallbackRef : localVideoRef}
+                className="vc-local"
+                autoPlay playsInline
+                muted={!swapped}
+                onClick={() => !swapped && setSwapped(true)}
+            />
 
             <div className="vc-controls">
                 <button className={`vc-btn ${isMuted ? "vc-btn-active" : ""}`} onClick={toggleMute}>
@@ -288,6 +333,9 @@ const VideoCall = () => {
                 </button>
                 <button className={`vc-btn ${isCameraOff ? "vc-btn-active" : ""}`} onClick={toggleCamera}>
                     {isCameraOff ? <FaVideoSlash /> : <FaVideo />}
+                </button>
+                <button className="vc-btn" onClick={flipCamera} title="Flip Camera">
+                    <FaCameraRotate />
                 </button>
             </div>
         </div>

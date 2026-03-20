@@ -1,5 +1,5 @@
 /* eslint-disable no-unused-vars */
-import { useState, useContext } from "react";
+import { useState, useContext, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import AuthContext from "../chat/authContext";
 import axios from "axios";
@@ -18,6 +18,10 @@ const Login = () => {
     const [showPassword, setShowPassword] = useState(false);
     const [loading, setLoading] = useState(false);
     const navigate = useNavigate();
+
+    useEffect(() => {
+        if (localStorage.getItem("token")) navigate("/chat");
+    }, []);
 
     const handleLogin = async (e) => {
         e.preventDefault();

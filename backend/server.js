@@ -148,6 +148,16 @@ io.on('connection', (socket) => {
     if (callerSocketId) io.to(callerSocketId).emit('call-rejected');
   });
 
+  socket.on('call-cancelled', ({ to }) => {
+    const receiverSocketId = onlineUsers[to];
+    if (receiverSocketId) io.to(receiverSocketId).emit('call-cancelled');
+  });
+
+  socket.on('audio-call-cancelled', ({ to }) => {
+    const receiverSocketId = onlineUsers[to];
+    if (receiverSocketId) io.to(receiverSocketId).emit('audio-call-cancelled');
+  });
+
   socket.on('call-ended', ({ to }) => {
     const otherUserSocketId = onlineUsers[to];
     if (otherUserSocketId) io.to(otherUserSocketId).emit('call-ended');
