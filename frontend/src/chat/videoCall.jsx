@@ -57,8 +57,10 @@ const VideoCall = () => {
     const [swapped, setSwapped] = useState(false);
     const [facingMode, setFacingMode] = useState("user");
     const [pipPos, setPipPos] = useState({ right: 20, bottom: 100 });
+    const [showControls, setShowControls] = useState(true);
     const durationRef = useRef(null);
     const dragRef = useRef(null);
+    const lastTapRef = useRef(0);
 
     const { receiverId } = useParams();
     const [searchParams] = useSearchParams();
@@ -244,6 +246,22 @@ const VideoCall = () => {
         return () => clearInterval(durationRef.current);
     }, [callEstablished]);
 
+    useEffect(() => {
+        if (!showControls) return;
+        const timer = setTimeout(() => setShowControls(false), 3000);
+        return () => clearTimeout(timer);
+    }, [showControls]);
+
+    const handleTap = () => {
+        const now = Date.now();
+        if (now - lastTapRef.current < 300) {
+            setSwapped(prev => !prev);
+        } else {
+            setShowControls(prev => !prev);
+        }
+        lastTapRef.current = now;
+    };
+
     const formatDuration = (s) => {
         const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
         return [h, m, sec].map(v => String(v).padStart(2, "0")).join(":");
@@ -296,7 +314,7 @@ const VideoCall = () => {
                 className="vc-remote"
                 autoPlay playsInline
                 muted={swapped}
-                onClick={() => setSwapped(prev => !prev)}
+                onClick={handleTap}
             />
 
             {!hasRemoteStream && (
@@ -332,7 +350,7 @@ const VideoCall = () => {
                 style={{ right: pipPos.right, bottom: pipPos.bottom, left: "unset", top: "unset" }}
                 onClick={() => {
                     if (dragRef.current?.didDrag) return;
-                    setSwapped(prev => !prev);
+                    handleTap();
                 }}
                 onMouseDown={(e) => {
                     e.preventDefault();
@@ -375,7 +393,7 @@ const VideoCall = () => {
                 }}
             />
 
-            <div className="vc-controls">
+            <div className={`vc-controls ${showControls ? "vc-show" : "vc-hide"}`}>
                 <button className={`vc-btn ${isMuted ? "vc-btn-active" : ""}`} onClick={toggleMute}>
                     {isMuted ? <FaMicrophoneSlash /> : <FaMicrophone />}
                 </button>

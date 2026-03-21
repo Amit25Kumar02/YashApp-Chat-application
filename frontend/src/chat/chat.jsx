@@ -631,6 +631,8 @@ const Chat = () => {
     // ── Send media (images/videos) ──
     const sendImage = async () => {
         if (!mediaFiles.length || !receiverId) return;
+        if (isBlocked(receiverId)) { toast.error("You have blocked this user."); return; }
+        if (isBlockedByThem(receiverId)) { toast.error("You cannot send messages to this user."); return; }
         const formData = new FormData();
         mediaFiles.forEach(m => formData.append("files", m.file));
         const tempIds = mediaFiles.map(() => generateTempId());
